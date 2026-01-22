@@ -49,20 +49,43 @@ def send_telegram_message(message):
         return None
 
 def get_twitter_feed(username):
-    """Obtiene el feed RSS de una cuenta de Twitter"""
-    # Usando Nitter como fuente RSS
-    nitter_instances = [
-        f'https://nitter.net/{username}/rss',
-        f'https://nitter.privacydev.net/{username}/rss',
+    """Obtiene el feed RSS de una cuenta de Twitter usando RSS Bridge"""
+    # Instancias públicas de RSS Bridge que funcionan
+    rss_bridge_instances = [
+        'https://rss-bridge.org/bridge01',
+        'https://wtf.roflcopter.fr/rss-bridge',
+        'https://rssbridge.flossboxin.org.in',
     ]
     
-    for rss_url in nitter_instances:
+    for bridge_url in rss_bridge_instances:
         try:
-            feed = feedparser.parse(rss_url)
-            if feed.entries:
-                return feed
-        except:
+            # Formato: bridge_url/?action=display&bridge=Twitter&context=By+username&u=username&format=Atom
+            rss_url = f"{bridge_url}/?action=display&bridge=Twitter&context=By+username&u={username}&format=Atom"
+            
+            print(f"Intentando con: {bridge_url}")
+            
+            # Hacemos la petición con un timeout
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+            
+            response = requests.get(rss_url, headers=headers, timeout=15)
+            
+            if response.status_code == 200:
+                feed = feedparser.parse(response.content)
+                if feed.entries and len(feed.entries) > 0:
+                    print(f"✅ Feed obtenido exitosamente de {bridge_url}")
+                    return feed
+                else:
+                    print(f"Feed vacío desde {bridge_url}")
+            else:
+                print(f"Error {response.status_code} desde {bridge_url}")
+                
+        except Exception as e:
+            print(f"Error con {bridge_url}: {str(e)}")
             continue
+    
+    print(f"⚠️ No se pudo obtener feed de @{username} desde ningún bridge")
     return None
 
 def check_new_tweets():
