@@ -10,9 +10,9 @@ TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
 
 # Cuentas de Twitter a seguir (puedes agregar más)
 TWITTER_ACCOUNTS = [
-    'elonmusk',
-    'BTC',
-    'binance',
+    'Inversiones0101',
+    'Barchart',
+    '',
     # Agrega más cuentas aquí
 ]
 
