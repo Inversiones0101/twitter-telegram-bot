@@ -50,11 +50,14 @@ def send_telegram_message(message):
 
 def get_twitter_feed(username):
     """Obtiene el feed RSS de una cuenta de Twitter usando RSS Bridge"""
-    # Instancias públicas de RSS Bridge que funcionan
+    # Múltiples instancias públicas de RSS Bridge
     rss_bridge_instances = [
         'https://rss-bridge.org/bridge01',
         'https://wtf.roflcopter.fr/rss-bridge',
         'https://rssbridge.flossboxin.org.in',
+        'https://rss.nixnet.services',
+        'https://bridge.suumitsu.eu',
+        'https://rss-bridge.snopyta.org',
     ]
     
     for bridge_url in rss_bridge_instances:
@@ -64,23 +67,39 @@ def get_twitter_feed(username):
             
             print(f"Intentando con: {bridge_url}")
             
-            # Hacemos la petición con un timeout
+            # Hacemos la petición con un timeout más largo y reintentos
             headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
             }
             
-            response = requests.get(rss_url, headers=headers, timeout=15)
+            response = requests.get(rss_url, headers=headers, timeout=20, allow_redirects=True)
             
             if response.status_code == 200:
                 feed = feedparser.parse(response.content)
                 if feed.entries and len(feed.entries) > 0:
                     print(f"✅ Feed obtenido exitosamente de {bridge_url}")
+                    # Extraer el link correcto del tweet
+                    for entry in feed.entries:
+                        # Limpiar el link para que sea de twitter.com
+                        if hasattr(entry, 'link'):
+                            # Convertir links de nitter a twitter
+                            original_link = entry.link
+                            if 'nitter' in original_link:
+                                # Extraer el ID del tweet y reconstruir la URL
+                                parts = original_link.split('/')
+                                if len(parts) >= 5:
+                                    username_part = parts[-3]
+                                    tweet_id = parts[-1].split('#')[0]
+                                    entry.link = f"https://twitter.com/{username_part}/status/{tweet_id}"
                     return feed
                 else:
                     print(f"Feed vacío desde {bridge_url}")
             else:
                 print(f"Error {response.status_code} desde {bridge_url}")
                 
+        except requests.exceptions.Timeout:
+            print(f"Timeout con {bridge_url}")
+            continue
         except Exception as e:
             print(f"Error con {bridge_url}: {str(e)}")
             continue
