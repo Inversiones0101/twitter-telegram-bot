@@ -21,7 +21,7 @@ jobs:
         
     - name: Instalar dependencias
       run: |
-        pip install requests feedparser
+        pip install requests tweepy
         
     - name: Ejecutar bot
       env:
