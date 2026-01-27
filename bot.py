@@ -1,18 +1,17 @@
 import os
-import requests
-import feedparser
+import tweepy
 import json
-from datetime import datetime
+import requests
 
 # Configuración
 TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
 TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
+TWITTER_BEARER_TOKEN = os.environ.get('TWITTER_BEARER_TOKEN')
 
 # Cuentas de Twitter a seguir (puedes agregar más)
 TWITTER_ACCOUNTS = [
     'Inversiones0101',
     'Barchart',
-    '',
     # Agrega más cuentas aquí
 ]
 
@@ -48,97 +47,83 @@ def send_telegram_message(message):
         print(f"Error enviando mensaje: {e}")
         return None
 
-def get_twitter_feed(username):
-    """Obtiene el feed RSS de una cuenta de Twitter usando RSS Bridge"""
-    # Múltiples instancias públicas de RSS Bridge
-    rss_bridge_instances = [
-        'https://rss-bridge.org/bridge01',
-        'https://wtf.roflcopter.fr/rss-bridge',
-        'https://rssbridge.flossboxin.org.in',
-        'https://rss.nixnet.services',
-        'https://bridge.suumitsu.eu',
-        'https://rss-bridge.snopyta.org',
-    ]
-    
-    for bridge_url in rss_bridge_instances:
-        try:
-            # Formato: bridge_url/?action=display&bridge=Twitter&context=By+username&u=username&format=Atom
-            rss_url = f"{bridge_url}/?action=display&bridge=Twitter&context=By+username&u={username}&format=Atom"
+def get_user_tweets(client, username):
+    """Obtiene los tweets más recientes de un usuario usando Tweepy"""
+    try:
+        # Buscar el usuario por su username
+        user = client.get_user(username=username)
+        
+        if not user.data:
+            print(f"Usuario @{username} no encontrado")
+            return None
+        
+        user_id = user.data.id
+        
+        # Obtener los últimos tweets del usuario
+        tweets = client.get_users_tweets(
+            id=user_id,
+            max_results=5,
+            tweet_fields=['created_at', 'text'],
+            exclude=['retweets', 'replies']  # Excluir retweets y respuestas
+        )
+        
+        if tweets.data:
+            return tweets.data
+        else:
+            print(f"No hay tweets recientes de @{username}")
+            return None
             
-            print(f"Intentando con: {bridge_url}")
-            
-            # Hacemos la petición con un timeout más largo y reintentos
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            }
-            
-            response = requests.get(rss_url, headers=headers, timeout=20, allow_redirects=True)
-            
-            if response.status_code == 200:
-                feed = feedparser.parse(response.content)
-                if feed.entries and len(feed.entries) > 0:
-                    print(f"✅ Feed obtenido exitosamente de {bridge_url}")
-                    # Extraer el link correcto del tweet
-                    for entry in feed.entries:
-                        # Limpiar el link para que sea de twitter.com
-                        if hasattr(entry, 'link'):
-                            # Convertir links de nitter a twitter
-                            original_link = entry.link
-                            if 'nitter' in original_link:
-                                # Extraer el ID del tweet y reconstruir la URL
-                                parts = original_link.split('/')
-                                if len(parts) >= 5:
-                                    username_part = parts[-3]
-                                    tweet_id = parts[-1].split('#')[0]
-                                    entry.link = f"https://twitter.com/{username_part}/status/{tweet_id}"
-                    return feed
-                else:
-                    print(f"Feed vacío desde {bridge_url}")
-            else:
-                print(f"Error {response.status_code} desde {bridge_url}")
-                
-        except requests.exceptions.Timeout:
-            print(f"Timeout con {bridge_url}")
-            continue
-        except Exception as e:
-            print(f"Error con {bridge_url}: {str(e)}")
-            continue
-    
-    print(f"⚠️ No se pudo obtener feed de @{username} desde ningún bridge")
-    return None
+    except Exception as e:
+        print(f"Error obteniendo tweets de @{username}: {e}")
+        return None
 
 def check_new_tweets():
-    """Revisa si hay tweets nuevos"""
+    """Revisa si hay tweets nuevos usando la API oficial de Twitter"""
+    
+    if not TWITTER_BEARER_TOKEN:
+        print("❌ Error: TWITTER_BEARER_TOKEN no configurado")
+        return
+    
+    # Inicializar cliente de Tweepy
+    client = tweepy.Client(bearer_token=TWITTER_BEARER_TOKEN)
+    
     last_tweets = load_last_tweets()
     new_tweets_found = False
     
     for account in TWITTER_ACCOUNTS:
         print(f"Revisando @{account}...")
-        feed = get_twitter_feed(account)
         
-        if not feed or not feed.entries:
-            print(f"No se pudo obtener feed de @{account}")
+        tweets = get_user_tweets(client, account)
+        
+        if not tweets:
             continue
         
         # Obtener el tweet más reciente
-        latest_tweet = feed.entries[0]
-        tweet_link = latest_tweet.link
+        latest_tweet = tweets[0]
+        tweet_id = str(latest_tweet.id)
+        tweet_text = latest_tweet.text
+        tweet_url = f"https://twitter.com/{account}/status/{tweet_id}"
         
         # Revisar si ya enviamos este tweet
-        if account not in last_tweets or last_tweets[account] != tweet_link:
+        if account not in last_tweets or last_tweets[account] != tweet_id:
             # ¡Nuevo tweet encontrado!
+            
+            # Acortar el texto si es muy largo
+            if len(tweet_text) > 200:
+                tweet_text = tweet_text[:200] + "..."
+            
             message = f"""
 🐦 <b>Nuevo tweet de @{account}</b>
 
-{latest_tweet.title}
+{tweet_text}
 
-🔗 {tweet_link}
+🔗 {tweet_url}
 """
             
             result = send_telegram_message(message)
             if result:
                 print(f"✅ Tweet enviado de @{account}")
-                last_tweets[account] = tweet_link
+                last_tweets[account] = tweet_id
                 new_tweets_found = True
             else:
                 print(f"❌ Error enviando tweet de @{account}")
@@ -151,5 +136,5 @@ def check_new_tweets():
     print("✅ Revisión completada")
 
 if __name__ == "__main__":
-    print("🤖 Iniciando bot de Twitter → Telegram")
+    print("🤖 Iniciando bot de Twitter → Telegram (usando API oficial)")
     check_new_tweets()
