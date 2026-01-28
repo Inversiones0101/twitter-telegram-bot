@@ -13,10 +13,10 @@ TWITTER_ACCOUNTS = ['Inversiones0101', 'Barchart']
 
 # Lista de instancias de Nitter para probar en orden
 NITTER_INSTANCES = [
-    "https://nitter.poast.org",
-    "https://nitter.privacydev.net",
-    "https://nitter.cz",
-    "https://nitter.net"
+    "https://nitter.perennialte.ch",
+    "https://nitter.projectsegfau.lt",
+    "https://nitter.no-logs.com",
+    "https://nitter.rawbit.ninja"
 ]
 
 LAST_TWEETS_FILE = 'last_tweets.json'
@@ -60,7 +60,7 @@ def check_nitter():
             print(f"Probando instancia: {instance}...")
             
             try:
-                feed = feedparser.parse(feed_url)
+                feed = feedparser.parse(feed_url, agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36')
                 
                 # Si el feed tiene entradas, es que esta instancia funciona
                 if feed.entries:
