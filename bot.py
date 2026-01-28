@@ -11,8 +11,13 @@ TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
 # Cuentas de Twitter a seguir
 TWITTER_ACCOUNTS = ['Inversiones0101', 'Barchart']
 
-# Instancia de Nitter (si una falla, puedes cambiarla por nitter.poast.org o nitter.cz)
-NITTER_INSTANCE = "https://nitter.net"
+# Lista de instancias de Nitter para probar en orden
+NITTER_INSTANCES = [
+    "https://nitter.poast.org",
+    "https://nitter.privacydev.net",
+    "https://nitter.cz",
+    "https://nitter.net"
+]
 
 LAST_TWEETS_FILE = 'last_tweets.json'
 
@@ -32,47 +37,60 @@ def send_telegram_message(message):
     data = {
         'chat_id': TELEGRAM_CHAT_ID,
         'text': message,
-        'parse_mode': 'HTML'
+        'parse_mode': 'HTML',
+        'disable_web_page_preview': False
     }
-    response = requests.post(url, data=data)
-    return response.ok
+    try:
+        response = requests.post(url, data=data)
+        return response.ok
+    except:
+        return False
 
 def check_nitter():
     last_tweets = load_last_tweets()
     new_tweets_found = False
 
     for account in TWITTER_ACCOUNTS:
-        print(f"Revisando @{account} vía Nitter...")
-        # Construimos la URL del feed RSS
-        feed_url = f"{NITTER_INSTANCE}/{account}/rss"
+        print(f"--- Revisando @{account} ---")
+        success_for_this_account = False
         
-        try:
-            feed = feedparser.parse(feed_url)
-            if not feed.entries:
-                print(f"No se encontraron tweets para {account}")
-                continue
-
-            # El primer elemento es el tweet más reciente
-            latest_tweet = feed.entries[0]
-            tweet_id = latest_tweet.link # Usamos el link como ID único
-            tweet_text = latest_tweet.description
+        # Probamos cada instancia hasta que una funcione
+        for instance in NITTER_INSTANCES:
+            feed_url = f"{instance}/{account}/rss"
+            print(f"Probando instancia: {instance}...")
             
-            # Limpiar el texto (Nitter a veces mete HTML)
-            if account not in last_tweets or last_tweets[account] != tweet_id:
-                message = f"🐦 <b>Nuevo tweet de @{account}</b>\n\n{tweet_text}\n\n🔗 <a href='{latest_tweet.link}'>Ver en X</a>"
+            try:
+                feed = feedparser.parse(feed_url)
                 
-                if send_telegram_message(message):
-                    print(f"✅ Enviado: @{account}")
-                    last_tweets[account] = tweet_id
-                    new_tweets_found = True
-                
-                # Pausa breve para no saturar a Telegram
-                time.sleep(1)
-        except Exception as e:
-            print(f"Error con @{account}: {e}")
+                # Si el feed tiene entradas, es que esta instancia funciona
+                if feed.entries:
+                    latest_tweet = feed.entries[0]
+                    tweet_id = latest_tweet.link
+                    tweet_text = latest_tweet.description
+                    
+                    if account not in last_tweets or last_tweets[account] != tweet_id:
+                        message = f"🐦 <b>Nuevo tweet de @{account}</b>\n\n{tweet_text}\n\n🔗 <a href='{latest_tweet.link}'>Ver en X</a>"
+                        
+                        if send_telegram_message(message):
+                            print(f"✅ ¡Éxito con {instance}!")
+                            last_tweets[account] = tweet_id
+                            new_tweets_found = True
+                        
+                    else:
+                        print(f"☕ Sin tweets nuevos en {instance}")
+                    
+                    success_for_this_account = True
+                    break # Salimos del bucle de instancias para esta cuenta
+                else:
+                    print(f"⚠️ {instance} no devolvió tweets, probando siguiente...")
+            except Exception as e:
+                print(f"❌ Error en {instance}: {e}")
+            
+            time.sleep(1) # Pausa técnica entre intentos
 
     if new_tweets_found:
         save_last_tweets(last_tweets)
+    print("--- Proceso finalizado ---")
 
 if __name__ == "__main__":
     check_nitter()
