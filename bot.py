@@ -3,12 +3,17 @@ import tweepy
 import json
 import requests
 
-# Configuración
+# Configuración de Telegram
 TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
 TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
-TWITTER_BEARER_TOKEN = os.environ.get('TWITTER_BEARER_TOKEN')
 
-# Cuentas de Twitter a seguir (puedes agregar más)
+# Configuración de Twitter
+TWITTER_API_KEY = os.environ.get('TWITTER_API_KEY')
+TWITTER_API_KEY_SECRET = os.environ.get('TWITTER_API_KEY_SECRET')
+TWITTER_ACCESS_TOKEN = os.environ.get('TWITTER_ACCESS_TOKEN')
+TWITTER_ACCESS_TOKEN_SECRET = os.environ.get('TWITTER_ACCESS_TOKEN_SECRET')
+
+# Cuentas de Twitter a seguir
 TWITTER_ACCOUNTS = [
     'Inversiones0101',
     'Barchart',
@@ -47,32 +52,30 @@ def send_telegram_message(message):
         print(f"Error enviando mensaje: {e}")
         return None
 
-def get_user_tweets(client, username):
-    """Obtiene los tweets más recientes de un usuario usando Tweepy"""
+def get_user_tweets(api, username):
+    """Obtiene los tweets más recientes de un usuario"""
     try:
-        # Buscar el usuario por su username
-        user = client.get_user(username=username)
-        
-        if not user.data:
-            print(f"Usuario @{username} no encontrado")
-            return None
-        
-        user_id = user.data.id
-        
-        # Obtener los últimos tweets del usuario
-        tweets = client.get_users_tweets(
-            id=user_id,
-            max_results=5,
-            tweet_fields=['created_at', 'text'],
-            exclude=['retweets', 'replies']  # Excluir retweets y respuestas
+        # Obtener los últimos 5 tweets del usuario (excluyendo retweets)
+        tweets = api.user_timeline(
+            screen_name=username,
+            count=5,
+            exclude_replies=True,
+            include_rts=False,
+            tweet_mode='extended'
         )
         
-        if tweets.data:
-            return tweets.data
+        if tweets:
+            return tweets
         else:
             print(f"No hay tweets recientes de @{username}")
             return None
             
+    except tweepy.errors.NotFound:
+        print(f"❌ Usuario @{username} no encontrado")
+        return None
+    except tweepy.errors.Unauthorized:
+        print(f"❌ No tienes permiso para acceder a @{username}")
+        return None
     except Exception as e:
         print(f"Error obteniendo tweets de @{username}: {e}")
         return None
@@ -80,12 +83,32 @@ def get_user_tweets(client, username):
 def check_new_tweets():
     """Revisa si hay tweets nuevos usando la API oficial de Twitter"""
     
-    if not TWITTER_BEARER_TOKEN:
-        print("❌ Error: TWITTER_BEARER_TOKEN no configurado")
+    # Verificar que todas las credenciales estén configuradas
+    if not all([TWITTER_API_KEY, TWITTER_API_KEY_SECRET, 
+                TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_TOKEN_SECRET]):
+        print("❌ Error: Faltan credenciales de Twitter")
+        print(f"API_KEY: {'✅' if TWITTER_API_KEY else '❌'}")
+        print(f"API_KEY_SECRET: {'✅' if TWITTER_API_KEY_SECRET else '❌'}")
+        print(f"ACCESS_TOKEN: {'✅' if TWITTER_ACCESS_TOKEN else '❌'}")
+        print(f"ACCESS_TOKEN_SECRET: {'✅' if TWITTER_ACCESS_TOKEN_SECRET else '❌'}")
         return
     
-    # Inicializar cliente de Tweepy
-    client = tweepy.Client(bearer_token=TWITTER_BEARER_TOKEN)
+    # Autenticación con OAuth 1.0a
+    auth = tweepy.OAuth1UserHandler(
+        TWITTER_API_KEY,
+        TWITTER_API_KEY_SECRET,
+        TWITTER_ACCESS_TOKEN,
+        TWITTER_ACCESS_TOKEN_SECRET
+    )
+    api = tweepy.API(auth)
+    
+    # Verificar credenciales
+    try:
+        user = api.verify_credentials()
+        print(f"✅ Conectado a Twitter como: @{user.screen_name}")
+    except Exception as e:
+        print(f"❌ Error de autenticación: {e}")
+        return
     
     last_tweets = load_last_tweets()
     new_tweets_found = False
@@ -93,7 +116,7 @@ def check_new_tweets():
     for account in TWITTER_ACCOUNTS:
         print(f"Revisando @{account}...")
         
-        tweets = get_user_tweets(client, account)
+        tweets = get_user_tweets(api, account)
         
         if not tweets:
             continue
@@ -101,7 +124,7 @@ def check_new_tweets():
         # Obtener el tweet más reciente
         latest_tweet = tweets[0]
         tweet_id = str(latest_tweet.id)
-        tweet_text = latest_tweet.text
+        tweet_text = latest_tweet.full_text
         tweet_url = f"https://twitter.com/{account}/status/{tweet_id}"
         
         # Revisar si ya enviamos este tweet
@@ -109,8 +132,8 @@ def check_new_tweets():
             # ¡Nuevo tweet encontrado!
             
             # Acortar el texto si es muy largo
-            if len(tweet_text) > 200:
-                tweet_text = tweet_text[:200] + "..."
+            if len(tweet_text) > 300:
+                tweet_text = tweet_text[:300] + "..."
             
             message = f"""
 🐦 <b>Nuevo tweet de @{account}</b>
@@ -136,5 +159,5 @@ def check_new_tweets():
     print("✅ Revisión completada")
 
 if __name__ == "__main__":
-    print("🤖 Iniciando bot de Twitter → Telegram (usando API oficial)")
+    print("🤖 Iniciando bot de Twitter → Telegram (usando OAuth 1.0a)")
     check_new_tweets()
