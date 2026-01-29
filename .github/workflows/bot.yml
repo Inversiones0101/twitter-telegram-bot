@@ -2,15 +2,14 @@ name: Twitter a Telegram Pro
 
 on:
   schedule:
-    - cron: '*/15 * * * *' # Se ejecuta cada 15 minutos
-  workflow_dispatch: # Permite ejecutarlo manualmente con el botón
+    - cron: '*/15 * * * *'
+  workflow_dispatch: 
 
 jobs:
   build_and_run:
     runs-on: ubuntu-latest
-    
     permissions:
-      contents: write # Permiso necesario para guardar last_tweets.json
+      contents: write
 
     steps:
       - name: Descargar repositorio
