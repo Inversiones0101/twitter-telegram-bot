@@ -3,94 +3,80 @@ import json
 import requests
 import feedparser
 import time
+import random
 
-# Configuración de Telegram
+# --- CONFIGURACIÓN DE IDENTIDAD ---
+USER_AGENTS = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36'
+]
+
+# --- CARGA DE CONFIGURACIÓN DESDE SECRETS ---
 TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
 TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
-
-# Cuentas de Twitter a seguir
-TWITTER_ACCOUNTS = ['Inversiones0101', 'Barchart']
-
-# Lista de instancias de Nitter para probar en orden
-NITTER_INSTANCES = [
-    "https://nitter.perennialte.ch",
-    "https://nitter.projectsegfau.lt",
-    "https://nitter.no-logs.com",
-    "https://nitter.rawbit.ninja"
-]
+RSS_FEED_URL = os.environ.get('RSS_FEED_URL')
 
 LAST_TWEETS_FILE = 'last_tweets.json'
 
-def load_last_tweets():
-    try:
-        with open(LAST_TWEETS_FILE, 'r') as f:
-            return json.load(f)
-    except:
-        return {}
+def load_history():
+    if os.path.exists(LAST_TWEETS_FILE):
+        try:
+            with open(LAST_TWEETS_FILE, 'r') as f:
+                return json.load(f)
+        except:
+            return []
+    return []
 
-def save_last_tweets(last_tweets):
+def save_history(history):
     with open(LAST_TWEETS_FILE, 'w') as f:
-        json.dump(last_tweets, f)
+        json.dump(history[-50:], f)
 
-def send_telegram_message(message):
+def send_telegram(link):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    data = {
+    payload = {
         'chat_id': TELEGRAM_CHAT_ID,
-        'text': message,
-        'parse_mode': 'HTML',
-        'disable_web_page_preview': False
+        'text': link
     }
     try:
-        response = requests.post(url, data=data)
+        response = requests.post(url, data=payload, timeout=10)
         return response.ok
     except:
         return False
 
-def check_nitter():
-    last_tweets = load_last_tweets()
-    new_tweets_found = False
+def run_bot():
+    print("🛰️ Iniciando escaneo de nuevos tweets...")
+    
+    if not RSS_FEED_URL:
+        print("❌ ERROR: No se encontró la URL del Bridge en los Secrets.")
+        return
 
-    for account in TWITTER_ACCOUNTS:
-        print(f"--- Revisando @{account} ---")
-        success_for_this_account = False
+    history = load_history()
+    ua = random.choice(USER_AGENTS)
+    
+    # Leemos el Feed del Bridge
+    feed = feedparser.parse(RSS_FEED_URL, agent=ua)
+    
+    if not feed.entries:
+        print("📭 El feed está vacío o el link es incorrecto.")
+        return
+
+    new_count = 0
+    # Procesamos del más antiguo al más nuevo para mantener el orden
+    for entry in reversed(feed.entries):
+        tweet_link = entry.link
         
-        # Probamos cada instancia hasta que una funcione
-        for instance in NITTER_INSTANCES:
-            feed_url = f"{instance}/{account}/rss"
-            print(f"Probando instancia: {instance}...")
-            
-            try:
-                feed = feedparser.parse(feed_url, agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36')
-                
-                # Si el feed tiene entradas, es que esta instancia funciona
-                if feed.entries:
-                    latest_tweet = feed.entries[0]
-                    tweet_id = latest_tweet.link
-                    tweet_text = latest_tweet.description
-                    
-                    if account not in last_tweets or last_tweets[account] != tweet_id:
-                        message = f"🐦 <b>Nuevo tweet de @{account}</b>\n\n{tweet_text}\n\n🔗 <a href='{latest_tweet.link}'>Ver en X</a>"
-                        
-                        if send_telegram_message(message):
-                            print(f"✅ ¡Éxito con {instance}!")
-                            last_tweets[account] = tweet_id
-                            new_tweets_found = True
-                        
-                    else:
-                        print(f"☕ Sin tweets nuevos en {instance}")
-                    
-                    success_for_this_account = True
-                    break # Salimos del bucle de instancias para esta cuenta
-                else:
-                    print(f"⚠️ {instance} no devolvió tweets, probando siguiente...")
-            except Exception as e:
-                print(f"❌ Error en {instance}: {e}")
-            
-            time.sleep(1) # Pausa técnica entre intentos
-
-    if new_tweets_found:
-        save_last_tweets(last_tweets)
-    print("--- Proceso finalizado ---")
+        if tweet_link not in history:
+            print(f"🆕 Enviando: {tweet_link}")
+            if send_telegram(tweet_link):
+                history.append(tweet_link)
+                new_count += 1
+                time.sleep(1) 
+        
+    if new_count > 0:
+        save_history(history)
+        print(f"✅ ¡Éxito! {new_count} tweets nuevos enviados.")
+    else:
+        print("☕ Todo al día. Nada nuevo por ahora.")
 
 if __name__ == "__main__":
-    check_nitter()
+    run_bot()
