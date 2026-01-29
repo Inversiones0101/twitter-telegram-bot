@@ -1,44 +1,41 @@
-name: Twitter to Telegram Bot (Nitter Edition)
+name: Twitter a Telegram Pro
 
 on:
   schedule:
-    # Se ejecuta cada 15 minutos
-    - cron: '*/15 * * * *'
-  workflow_dispatch: # Permite ejecutarlo manualmente desde la pestaña Actions
+    - cron: '*/15 * * * *' # Se ejecuta cada 15 minutos
+  workflow_dispatch: # Permite ejecutarlo manualmente con el botón
 
 jobs:
-  run-bot:
+  build_and_run:
     runs-on: ubuntu-latest
     
-    # Añadimos permisos explícitos para que el bot pueda guardar el archivo JSON
     permissions:
-      contents: write
-    
+      contents: write # Permiso necesario para guardar last_tweets.json
+
     steps:
-    - name: Checkout código
-      uses: actions/checkout@v3
-      
-    - name: Setup Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.10'
-        
-    - name: Instalar dependencias
-      run: |
-        pip install requests feedparser
-        
-    - name: Ejecutar bot
-      env:
-        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-      run: |
-        python bot.py
-        
-    - name: Guardar estado (Persistencia)
-      run: |
-        git config --global user.name 'github-actions[bot]'
-        git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-        # Solo hace commit si el archivo last_tweets.json cambió
-        git add last_tweets.json || true
-        git commit -m "Bot: Actualizar historial de tweets" || true
-        git push || true
+      - name: Descargar repositorio
+        uses: actions/checkout@v3
+
+      - name: Instalar Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Instalar Librerías
+        run: |
+          pip install requests feedparser
+
+      - name: Ejecutar Bot
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          RSS_FEED_URL: ${{ secrets.RSS_FEED_URL }}
+        run: python bot.py
+
+      - name: Guardar Historial
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add last_tweets.json || true
+          git commit -m "🤖 Actualizar historial de tweets" || true
+          git push || true
