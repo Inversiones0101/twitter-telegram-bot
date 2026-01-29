@@ -11,7 +11,7 @@ USER_AGENTS = [
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36'
 ]
 
-# --- CARGA DE CONFIGURACIÓN DESDE SECRETS ---
+# --- CARGA DE SECRETS ---
 TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
 TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
 RSS_FEED_URL = os.environ.get('RSS_FEED_URL')
@@ -33,12 +33,9 @@ def save_history(history):
 
 def send_telegram(link):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    payload = {
-        'chat_id': TELEGRAM_CHAT_ID,
-        'text': link
-    }
+    payload = {'chat_id': TELEGRAM_CHAT_ID, 'text': link}
     try:
-        response = requests.post(url, data=payload, timeout=10)
+        response = requests.post(url, data=payload, timeout=15)
         return response.ok
     except:
         return False
@@ -50,33 +47,36 @@ def run_bot():
         print("❌ ERROR: No se encontró la URL del Bridge en los Secrets.")
         return
 
+    # Limpiamos el link por si acaso se coló un espacio o un "/add "
+    clean_url = RSS_FEED_URL.replace('/add ', '').strip()
+
     history = load_history()
     ua = random.choice(USER_AGENTS)
     
-    # Leemos el Feed del Bridge
-    feed = feedparser.parse(RSS_FEED_URL, agent=ua)
+    # Leemos el Feed
+    feed = feedparser.parse(clean_url, agent=ua)
     
     if not feed.entries:
-        print("📭 El feed está vacío o el link es incorrecto.")
+        print(f"📭 El feed parece vacío. URL detectada: {clean_url[:30]}...")
         return
 
     new_count = 0
-    # Procesamos del más antiguo al más nuevo para mantener el orden
+    # Invertimos para enviar primero el más viejo
     for entry in reversed(feed.entries):
         tweet_link = entry.link
         
         if tweet_link not in history:
-            print(f"🆕 Enviando: {tweet_link}")
+            print(f"🆕 Enviando tweet: {tweet_link}")
             if send_telegram(tweet_link):
                 history.append(tweet_link)
                 new_count += 1
-                time.sleep(1) 
+                time.sleep(2) 
         
     if new_count > 0:
         save_history(history)
-        print(f"✅ ¡Éxito! {new_count} tweets nuevos enviados.")
+        print(f"✅ ¡Misión cumplida! {new_count} tweets enviados.")
     else:
-        print("☕ Todo al día. Nada nuevo por ahora.")
+        print("☕ Nada nuevo por aquí, seguiremos vigilando.")
 
 if __name__ == "__main__":
     run_bot()
