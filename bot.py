@@ -13,41 +13,48 @@ LAST_TWEETS_FILE = 'last_tweets.json'
 
 def send_telegram(link):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    payload = {'chat_id': TELEGRAM_CHAT_ID, 'text': link}
     try:
-        response = requests.post(url, data=payload, timeout=20)
-        return response.ok
+        res = requests.post(url, data={'chat_id': TELEGRAM_CHAT_ID, 'text': link}, timeout=20)
+        return res.ok
     except:
         return False
 
 def run_bot():
-    print("🛰️ Iniciando escaneo profundo de tweets...")
+    print("🕵️ Modo infiltrado activado...")
     
     if not RSS_FEED_URL:
-        print("❌ Error: No hay URL en los Secrets.")
+        print("❌ Error: Falta RSS_FEED_URL.")
         return
 
-    # Limpieza extrema del link
     clean_url = RSS_FEED_URL.replace('/add ', '').strip()
     
-    # Usamos un "disfraz" de navegador para que el Bridge no nos bloquee
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+    # Cabeceras de un navegador real para evitar bloqueos
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Connection': 'keep-alive',
+    }
     
     try:
-        # Primero descargamos el contenido crudo
-        response = requests.get(clean_url, headers=headers, timeout=30)
-        print(f"📡 Estado del Bridge: {response.status_code}")
+        # Descargamos el contenido como un humano
+        session = requests.Session()
+        response = session.get(clean_url, headers=headers, timeout=30)
         
-        # Luego lo pasamos al lector de feeds
+        print(f"📡 Respuesta del Bridge: {response.status_code}")
+        
+        # Si recibimos HTML en lugar de XML (Tweets), hay un problema de link
+        if "<!DOCTYPE html" in response.text[:100]:
+            print("❌ EL BRIDGE ENVIÓ UNA PÁGINA DE ERROR. El link de los Secrets está mal.")
+            return
+
         feed = feedparser.parse(response.content)
         
         if not feed.entries:
-            print("📭 El feed sigue pareciendo vacío. Intenta generar el link SOLO con ListID.")
-            # Imprimimos parte del error para debug
-            print(f"DEBUG: Contenido recibido: {response.text[:100]}...")
+            print("📭 Feed vacío. El Bridge no encontró tweets en esa lista.")
             return
 
-        print(f"✅ ¡Éxito! Se detectaron {len(feed.entries)} entradas.")
+        print(f"✅ ¡Conseguido! {len(feed.entries)} tweets encontrados.")
         
         history = []
         if os.path.exists(LAST_TWEETS_FILE):
@@ -63,10 +70,10 @@ def run_bot():
                     time.sleep(2)
 
         with open(LAST_TWEETS_FILE, 'w') as f: json.dump(history[-50:], f)
-        print(f"🏁 Proceso finalizado. {new_count} tweets nuevos.")
+        print(f"🏁 Finalizado con {new_count} envíos.")
 
     except Exception as e:
-        print(f"❌ Error crítico: {e}")
+        print(f"❌ Error: {e}")
 
 if __name__ == "__main__":
     run_bot()
