@@ -1,40 +1,31 @@
-name: Twitter a Telegram Pro
+name: Bot Fotografo Inversiones
 
 on:
+  workflow_dispatch: # Para que puedas darle al boton "Play" manualmente
   schedule:
-    - cron: '*/15 * * * *'
-  workflow_dispatch: 
+    - cron: '*/15 * * * *' # Se ejecuta cada 15 minutos
 
 jobs:
-  build_and_run:
+  build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
     steps:
-      - name: Descargar repositorio
+      - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Instalar Python
-        uses: actions/setup-python@v4
+      - name: Set up Python
+        uses: actions/set-up-python@v4
         with:
-          python-version: '3.10'
+          python-version: '3.9'
 
-      - name: Instalar Librerías
+      - name: Install dependencies
         run: |
-          pip install requests feedparser
+          pip install playwright requests
+          playwright install chromium # Instala el ojo del bot
 
-      - name: Ejecutar Bot
+      - name: Run Bot
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          RSS_FEED_URL: ${{ secrets.RSS_FEED_URL }}
+          X_USER: ${{ secrets.X_USER }}
+          X_PASSWORD: ${{ secrets.X_PASSWORD }}
         run: python bot.py
-
-      - name: Guardar Historial
-        run: |
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git add last_tweets.json || true
-          git commit -m "🤖 Actualizar historial de tweets" || true
-          git push || true
