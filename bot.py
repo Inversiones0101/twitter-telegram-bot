@@ -3,6 +3,15 @@ import time
 import requests
 from playwright.sync_api import sync_playwright
 
+# Configuración de cuentas
+CUENTAS = [
+    "https://x.com/Barchart",
+    "https://x.com/TrendSpider",
+    "https://x.com/AndresConstabel",
+    "https://x.com/chtrader",
+    "https://x.com/DolarBlueDiario"
+]
+
 def enviar_telegram(imagen_path, texto):
     token = os.getenv('TELEGRAM_BOT_TOKEN')
     chat_id = os.getenv('TELEGRAM_CHAT_ID')
@@ -12,35 +21,48 @@ def enviar_telegram(imagen_path, texto):
 
 def capturar_tweet(url_cuenta):
     with sync_playwright() as p:
-        # Usamos un "User Agent" para parecer una persona real y no un bot
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
         )
         page = context.new_page()
         
-        print(f"Visitando {url_cuenta}...")
-        # Le damos más tiempo (60 segundos) y esperamos a que cargue lo básico
         try:
+            print(f"Buscando novedades en {url_cuenta}...")
             page.goto(url_cuenta, wait_until="domcontentloaded", timeout=60000)
-            time.sleep(10) # Pausa generosa para que aparezcan los tweets
+            time.sleep(10) 
             
-            path_foto = "tweet.png"
-            # Intentamos capturar el primer artículo que aparezca
-            page.locator('article').first.screenshot(path=path_foto)
+            # Buscamos el link único del tweet para saber si es nuevo
+            tweet_element = page.locator('article').first
+            nuevo_id = tweet_element.locator('time').parent().get_attribute('href')
+            
+            # Verificamos si ya lo enviamos antes
+            log_file = f"last_id_{url_cuenta.split('/')[-1]}.txt"
+            if os.path.exists(log_file):
+                with open(log_file, "r") as f:
+                    if f.read() == nuevo_id:
+                        print(f"No hay nada nuevo en {url_cuenta}")
+                        browser.close()
+                        return None, None
+
+            # Si es nuevo, sacamos la foto
+            path_foto = f"foto_{url_cuenta.split('/')[-1]}.png"
+            tweet_element.screenshot(path=path_foto)
+            
+            # Guardamos el nuevo ID
+            with open(log_file, "w") as f:
+                f.write(nuevo_id)
+            
             browser.close()
-            return path_foto
+            return path_foto, nuevo_id
         except Exception as e:
-            print(f"Error detallado: {e}")
+            print(f"Error en {url_cuenta}: {e}")
             browser.close()
-            return None
+            return None, None
 
 if __name__ == "__main__":
-    # Probemos con Barchart que suele cargar más rápido
-    cuenta_prueba = "https://x.com/Barchart"
-    foto = capturar_tweet(cuenta_prueba)
-    if foto:
-        enviar_telegram(foto, f"📸 ¡Prueba superada! Captura de {cuenta_prueba}")
-        print("¡Éxito total!")
-    else:
-        print("No se pudo sacar la foto, reintentando...")
+    for cuenta in CUENTAS:
+        foto, id_tweet = capturar_tweet(cuenta)
+        if foto:
+            enviar_telegram(foto, f"📈 Novedad de {cuenta}\n🔗 Link: https://x.com{id_tweet}")
+            print(f"¡Foto enviada de {cuenta}!")
