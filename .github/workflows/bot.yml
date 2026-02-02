@@ -1,9 +1,9 @@
 name: Bot Fotografo Inversiones
 
 on:
-  workflow_dispatch: # Para que puedas darle al boton "Play" manualmente
+  workflow_dispatch:
   schedule:
-    - cron: '*/15 * * * *' # Se ejecuta cada 15 minutos
+    - cron: '*/15 * * * *'
 
 jobs:
   build:
@@ -13,14 +13,14 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Set up Python
-        uses: actions/set-up-python@v4
+        uses: actions/setup-python@v4 # <-- CORREGIDO AQUÍ
         with:
           python-version: '3.9'
 
       - name: Install dependencies
         run: |
           pip install playwright requests
-          playwright install chromium # Instala el ojo del bot
+          playwright install --with-deps chromium # Agregamos --with-deps para evitar errores de sistema
 
       - name: Run Bot
         env:
