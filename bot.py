@@ -1,49 +1,41 @@
 import os
-import json
-import requests
-import feedparser
 import time
+import requests
+from playwright.sync_api import sync_playwright
 
-# --- CONFIGURACIÓN ---
-TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
-TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
-RSS_FEED_URL = os.environ.get('RSS_FEED_URL')
-LAST_TWEETS_FILE = 'last_tweets.json'
-
-def run_bot():
-    print("🚀 Iniciando el bot con el nuevo puente...")
+def enviar_telegram(imagen_path, texto):
+    token = os.getenv('TELEGRAM_BOT_TOKEN')
+    chat_id = os.getenv('TELEGRAM_CHAT_ID')
+    url = f"https://api.telegram.org/bot{token}/sendPhoto"
     
-    # Cargamos historial para no repetir
-    history = []
-    if os.path.exists(LAST_TWEETS_FILE):
-        with open(LAST_TWEETS_FILE, 'r') as f:
-            history = json.load(f)
+    with open(imagen_path, 'rb') as photo:
+        requests.post(url, data={'chat_id': chat_id, 'caption': texto}, files={'photo': photo})
 
-    # Leemos el feed
-    feed = feedparser.parse(RSS_FEED_URL)
-    
-    if not feed.entries:
-        print("📭 El feed sigue vacío. Probando método alternativo...")
-        return
-
-    new_count = 0
-    for entry in reversed(feed.entries):
-        if entry.link not in history:
-            # Enviar a Telegram
-            url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-            payload = {'chat_id': TELEGRAM_CHAT_ID, 'text': entry.link}
-            
-            res = requests.post(url, data=payload)
-            if res.ok:
-                history.append(entry.link)
-                new_count += 1
-                print(f"✅ Enviado: {entry.link}")
-                time.sleep(2) # Pausa para evitar spam
-
-    # Guardar progreso
-    with open(LAST_TWEETS_FILE, 'w') as f:
-        json.dump(history[-50:], f)
-    print(f"🏁 Finalizado. Se enviaron {new_count} tweets.")
+def capturar_tweet(url_cuenta):
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True) # Navegador invisible
+        context = browser.new_context(viewport={'width': 1280, 'height': 800})
+        page = context.new_page()
+        
+        # 1. Ir a la cuenta
+        print(f"Visitando {url_cuenta}...")
+        page.goto(url_cuenta, wait_until="networkidle")
+        time.sleep(5) # Esperar a que carguen los graficos
+        
+        # 2. Sacar la foto del primer tweet
+        # Usamos un selector basico para capturar el primer articulo/tweet
+        path_foto = "tweet.png"
+        page.locator('article').first.screenshot(path=path_foto)
+        
+        browser.close()
+        return path_foto
 
 if __name__ == "__main__":
-    run_bot()
+    # Prueba inicial con una cuenta de tu lista
+    cuenta_prueba = "https://x.com/DolarBlueDiario"
+    try:
+        foto = capturar_tweet(cuenta_prueba)
+        enviar_telegram(foto, f"📸 Captura fresca de {cuenta_prueba}")
+        print("¡Exito! Foto enviada a Telegram.")
+    except Exception as e:
+        print(f"Error: {e}")
