@@ -9,7 +9,9 @@ CUENTAS = [
     "https://x.com/TrendSpider",
     "https://x.com/AndresConstabel",
     "https://x.com/chtrader",
-    "https://x.com/DolarBlueDiario"
+    "https://x.com/BancoCentral_AR",
+    "https://x.com/robertojirusta",
+    "https://x.com/leofinanzas"
 ]
 
 def enviar_telegram_texto(texto):
