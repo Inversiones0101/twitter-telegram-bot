@@ -32,11 +32,13 @@ def capturar_tweet(url_cuenta):
             page.goto(url_cuenta, wait_until="domcontentloaded", timeout=60000)
             time.sleep(10) 
             
-            # Buscamos el link único del tweet para saber si es nuevo
+            # Buscamos el primer tweet disponible
             tweet_element = page.locator('article').first
-            nuevo_id = tweet_element.locator('time').parent().get_attribute('href')
             
-            # Verificamos si ya lo enviamos antes
+            # Buscamos el link del tweet de forma más segura
+            # Buscamos el elemento 'a' que contiene el tiempo (time)
+            nuevo_id = tweet_element.locator('time').locator('xpath=..').get_attribute('href')
+            
             log_file = f"last_id_{url_cuenta.split('/')[-1]}.txt"
             if os.path.exists(log_file):
                 with open(log_file, "r") as f:
@@ -45,11 +47,9 @@ def capturar_tweet(url_cuenta):
                         browser.close()
                         return None, None
 
-            # Si es nuevo, sacamos la foto
             path_foto = f"foto_{url_cuenta.split('/')[-1]}.png"
             tweet_element.screenshot(path=path_foto)
             
-            # Guardamos el nuevo ID
             with open(log_file, "w") as f:
                 f.write(nuevo_id)
             
