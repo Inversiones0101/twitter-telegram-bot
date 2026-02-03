@@ -3,7 +3,7 @@ import time
 import requests
 from playwright.sync_api import sync_playwright
 
-# Configuración de cuentas
+# Tu lista de objetivos
 CUENTAS = [
     "https://x.com/Barchart",
     "https://x.com/TrendSpider",
@@ -12,14 +12,14 @@ CUENTAS = [
     "https://x.com/DolarBlueDiario"
 ]
 
-def enviar_telegram(imagen_path, texto):
+def enviar_telegram_texto(texto):
     token = os.getenv('TELEGRAM_BOT_TOKEN')
     chat_id = os.getenv('TELEGRAM_CHAT_ID')
-    url = f"https://api.telegram.org/bot{token}/sendPhoto"
-    with open(imagen_path, 'rb') as photo:
-        requests.post(url, data={'chat_id': chat_id, 'caption': texto}, files={'photo': photo})
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = {'chat_id': chat_id, 'text': texto, 'parse_mode': 'Markdown'}
+    requests.post(url, data=payload)
 
-def capturar_tweet(url_cuenta):
+def vigilar_y_fixup(url_cuenta):
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(
@@ -28,41 +28,40 @@ def capturar_tweet(url_cuenta):
         page = context.new_page()
         
         try:
-            print(f"Buscando novedades en {url_cuenta}...")
+            print(f"Buscando link en {url_cuenta}...")
             page.goto(url_cuenta, wait_until="domcontentloaded", timeout=60000)
-            time.sleep(10) 
+            time.sleep(5) # Menos tiempo porque no necesitamos que cargue la imagen
             
-            # Buscamos el primer tweet disponible
+            # Obtenemos el link del primer tweet
             tweet_element = page.locator('article').first
+            path_tweet = tweet_element.locator('time').locator('xpath=..').get_attribute('href')
             
-            # Buscamos el link del tweet de forma más segura
-            # Buscamos el elemento 'a' que contiene el tiempo (time)
-            nuevo_id = tweet_element.locator('time').locator('xpath=..').get_attribute('href')
+            # Convertimos x.com en fixupx.com
+            link_fixup = f"https://fixupx.com{path_tweet}"
             
+            # Sistema de memoria (para no repetir)
             log_file = f"last_id_{url_cuenta.split('/')[-1]}.txt"
             if os.path.exists(log_file):
                 with open(log_file, "r") as f:
-                    if f.read() == nuevo_id:
-                        print(f"No hay nada nuevo en {url_cuenta}")
+                    if f.read() == link_fixup:
+                        print(f"Sin novedades en {url_cuenta}")
                         browser.close()
-                        return None, None
+                        return None
 
-            path_foto = f"foto_{url_cuenta.split('/')[-1]}.png"
-            tweet_element.screenshot(path=path_foto)
-            
+            # Guardamos la memoria
             with open(log_file, "w") as f:
-                f.write(nuevo_id)
+                f.write(link_fixup)
             
             browser.close()
-            return path_foto, nuevo_id
+            return link_fixup
         except Exception as e:
             print(f"Error en {url_cuenta}: {e}")
             browser.close()
-            return None, None
+            return None
 
 if __name__ == "__main__":
     for cuenta in CUENTAS:
-        foto, id_tweet = capturar_tweet(cuenta)
-        if foto:
-            enviar_telegram(foto, f"📈 Novedad de {cuenta}\n🔗 Link: https://x.com{id_tweet}")
-            print(f"¡Foto enviada de {cuenta}!")
+        enlace_magico = vigilar_y_fixup(cuenta)
+        if enlace_magico:
+            enviar_telegram_texto(f"🚀 *Nueva publicación de {cuenta.split('/')[-1]}*\n\n{enlace_magico}")
+            print(f"¡Enlace enviado: {enlace_magico}!")
