@@ -29,3 +29,17 @@ jobs:
           X_USER: ${{ secrets.X_USER }}
           X_PASSWORD: ${{ secrets.X_PASSWORD }}
         run: python bot.py
+
+      - name: Run Bot
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python bot.py
+
+      - name: Save memory
+        run: |
+          git config --global user.name "BotInversiones"
+          git config --global user.email "bot@inversiones.com"
+          git add *.txt
+          git commit -m "Actualizar memoria de tweets" || exit 0
+          git push
