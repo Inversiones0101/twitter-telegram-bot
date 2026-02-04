@@ -9,7 +9,6 @@ CUENTAS = [
     "https://x.com/TrendSpider",
     "https://x.com/AndresConstabel",
     "https://x.com/chtrader",
-    "https://x.com/BancoCentral_AR",
     "https://x.com/robertojirusta",
     "https://x.com/leofinanzas"
 ]
