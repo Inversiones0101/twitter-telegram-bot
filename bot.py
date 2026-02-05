@@ -21,6 +21,7 @@ def capturar_y_enviar():
         "https://nitter.cz",
         "https://nitter.privacydev.net",
         "https://nitter.no-logs.com",
+        "https://nitter.poast.org", # <-- Agregamos esta
         "https://nitter.net"
     ]
 
