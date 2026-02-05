@@ -32,6 +32,7 @@ jobs:
         run: |
           git config --global user.name "BotInversiones"
           git config --global user.email "bot@inversiones.com"
+          git pull --rebase origin main # Esto evita el error de "rejected"
           git add last_id_*.txt
           git commit -m "Actualizar memoria de capturas" || exit 0
-          git push
+          git push origin main
