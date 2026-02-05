@@ -25,16 +25,19 @@ def obtener_tweet(cuenta):
         page = context.new_page()
         
         try:
-            # Vamos directo a los tweets, esto suele saltar el bloqueo de perfil
-            url = f"https://syndication.twitter.com/srv/timeline-profile/screen-name/{cuenta}"
-            page.goto(url, wait_until="networkidle", timeout=60000)
+            # Nueva URL con límite para carga rápida
+            url = f"https://syndication.twitter.com/srv/timeline-profile/screen-name/{cuenta}?limit=3"
+            page.goto(url, wait_until="domcontentloaded", timeout=60000)
             
-            # Buscamos el ID del tweet en el código de la página
+            # Espera estratégica para que cargue el contenido dinámico
+            time.sleep(5)
             content = page.content()
-            # Buscamos el patrón de un ID de tweet (números largos)
-            import re
-            ids = re.findall(r'status/(\d+)', content)
             
+            # Búsqueda doble: por etiqueta interna y por estructura de link
+            ids = re.findall(r'"tweet_id":"(\d+)"', content)
+            if not ids:
+                ids = re.findall(r'status/(\d+)', content)
+
             if not ids:
                 print(f"No se detectaron tweets para {cuenta}")
                 return None
