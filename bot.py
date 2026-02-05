@@ -2,85 +2,66 @@ import os
 import time
 import requests
 from playwright.sync_api import sync_playwright
+import random
+import re 
 
-# Tu lista de objetivos actualizada
-CUENTAS = [
-    "https://x.com/Barchart",
-    "https://x.com/TrendSpider",
-    "https://x.com/AndresConstabel",
-    "https://x.com/chtrader",
-    "https://x.com/robertojirusta",
-    "https://x.com/leofinanzas"
-]
+CUENTAS = ["Barchart", "TrendSpider", "AndresConstabel", "chtrader", "robertojirusta", "leofinanzas"]
 
-def enviar_telegram_texto(texto):
+def enviar_telegram(texto):
     token = os.getenv('TELEGRAM_BOT_TOKEN')
     chat_id = os.getenv('TELEGRAM_CHAT_ID')
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     payload = {'chat_id': chat_id, 'text': texto, 'parse_mode': 'Markdown'}
     requests.post(url, data=payload)
 
-def vigilar_y_fixup(url_cuenta):
+def obtener_tweet(cuenta):
     with sync_playwright() as p:
+        # Usamos un navegador que parece un usuario real
         browser = p.chromium.launch(headless=True)
-        # Forzamos idioma y un navegador moderno para evitar bloqueos
         context = browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
-            locale="es-AR"
+            user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Mobile/15E148 Safari/604.1",
+            viewport={'width': 375, 'height': 667} # Simula un celular
         )
         page = context.new_page()
         
         try:
-            print(f"Buscando link en {url_cuenta}...")
-            # Tiempo de espera generoso para cargar el contenido pesado de X
-            page.goto(url_cuenta, wait_until="domcontentloaded", timeout=60000)
-            page.wait_for_selector('article', timeout=20000) 
-            time.sleep(5) 
+            # Vamos directo a los tweets, esto suele saltar el bloqueo de perfil
+            url = f"https://syndication.twitter.com/srv/timeline-profile/screen-name/{cuenta}"
+            page.goto(url, wait_until="networkidle", timeout=60000)
             
-            tweet_element = page.locator('article').first
+            # Buscamos el ID del tweet en el código de la página
+            content = page.content()
+            # Buscamos el patrón de un ID de tweet (números largos)
+            import re
+            ids = re.findall(r'status/(\d+)', content)
             
-            # Buscador de links mejorado: rastrea todos los enlaces del tweet
-            links = tweet_element.locator('a').all()
-            path_tweet = None
-            for link in links:
-                href = link.get_attribute('href')
-                # Buscamos el patrón único de un tweet: /status/número
-                if href and '/status/' in href and not 'photo' in href:
-                    path_tweet = href
-                    break
-            
-            if not path_tweet:
-                print(f"No se encontró link válido en {url_cuenta}")
+            if not ids:
+                print(f"No se detectaron tweets para {cuenta}")
                 return None
-
-            # Aplicamos tu toque maestro: FixupX
-            link_fixup = f"https://fixupx.com{path_tweet}"
             
-            # SISTEMA DE MEMORIA PERSISTENTE
-            log_file = f"last_id_{url_cuenta.split('/')[-1]}.txt"
+            id_reciente = ids[0]
+            link_fixup = f"https://fixupx.com/{cuenta}/status/{id_reciente}"
+            
+            # MEMORIA
+            log_file = f"last_id_{cuenta}.txt"
             if os.path.exists(log_file):
                 with open(log_file, "r") as f:
-                    if f.read().strip() == link_fixup:
-                        print(f"Sin novedades en {url_cuenta}")
-                        browser.close()
+                    if f.read().strip() == id_reciente:
                         return None
 
-            # Guardamos el ID localmente (luego el .yml lo subirá a GitHub)
             with open(log_file, "w") as f:
-                f.write(link_fixup)
+                f.write(id_reciente)
             
-            browser.close()
             return link_fixup
         except Exception as e:
-            print(f"Error en {url_cuenta}: {e}")
-            browser.close()
+            print(f"Error en {cuenta}: {e}")
             return None
+        finally:
+            browser.close()
 
 if __name__ == "__main__":
-    for cuenta in CUENTAS:
-        enlace = vigilar_y_fixup(cuenta)
-        if enlace:
-            # Enviamos el link con estética limpia a Telegram
-            nombre = cuenta.split('/')[-1]
-            enviar_telegram_texto(f"🚀 *Nueva publicación de {nombre}*\n\n{enlace}")
-            print(f"¡Enviado con éxito: {nombre}!")
+    for c in CUENTAS:
+        resultado = obtener_tweet(c)
+        if resultado:
+            enviar_telegram(f"🚀 *Nuevo de {c}*\n\n{resultado}")
+            time.sleep(random.randint(5, 10)) # Espera aleatoria para no ser detectado
