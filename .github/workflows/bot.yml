@@ -3,7 +3,7 @@ name: Bot Fotografo Inversiones
 on:
   workflow_dispatch:
   schedule:
-    - cron: '*/15 * * * *'
+    - cron: '*/15 * * * *' # Cada 15 minutos
 
 jobs:
   build:
@@ -13,22 +13,14 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Set up Python
-        uses: actions/setup-python@v4 # <-- CORREGIDO AQUÍ
+        uses: actions/setup-python@v4
         with:
           python-version: '3.9'
 
       - name: Install dependencies
         run: |
-          pip install playwright requests
-          playwright install --with-deps chromium # Agregamos --with-deps para evitar errores de sistema
-
-      - name: Run Bot
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          X_USER: ${{ secrets.X_USER }}
-          X_PASSWORD: ${{ secrets.X_PASSWORD }}
-        run: python bot.py
+          pip install requests playwright
+          playwright install chromium
 
       - name: Run Bot
         env:
@@ -40,6 +32,6 @@ jobs:
         run: |
           git config --global user.name "BotInversiones"
           git config --global user.email "bot@inversiones.com"
-          git add *.txt
-          git commit -m "Actualizar memoria de tweets" || exit 0
+          git add last_id_*.txt
+          git commit -m "Actualizar memoria de capturas" || exit 0
           git push
