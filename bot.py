@@ -16,54 +16,60 @@ def enviar_telegram_foto(foto_path, cuenta, link):
         requests.post(url, data=payload, files=files)
 
 def capturar_y_enviar():
-    # Lista de espejos de Twitter que no bloquean
-    instancias = [
-        "https://nitter.cz",
-        "https://nitter.privacydev.net",
-        "https://nitter.no-logs.com",
-        "https://nitter.poast.org", # <-- Agregamos esta
-        "https://nitter.net"
-    ]
+    # Usamos nitter.net como principal ya que viste que funciona bien manual
+    instancias = ["https://nitter.net", "https://nitter.cz", "https://nitter.no-logs.com"]
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
-        context = browser.new_context(viewport={'width': 400, 'height': 800})
+        # DISFRAZ: Navegador de iPhone para saltar bloqueos 403
+        context = browser.new_context(
+            user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1 Mobile/15E148 Safari/604.1",
+            viewport={'width': 400, 'height': 800}
+        )
         page = context.new_page()
 
         for cuenta in CUENTAS:
-            exito = False
+            exito_cuenta = False
             for base_url in instancias:
-                if exito: break
+                if exito_cuenta: break
                 try:
-                    print(f"Probando {cuenta} en {base_url}...")
-                    page.goto(f"{base_url}/{cuenta}", wait_until="domcontentloaded", timeout=25000)
-                    time.sleep(5)
-
-                    tweet_selector = '.timeline-item'
-                    primer_tweet = page.locator(tweet_selector).first
+                    url_directa = f"{base_url}/{cuenta}"
+                    print(f"Navegando a {url_directa}...")
                     
-                    if primer_tweet.count() > 0:
-                        texto_tweet = primer_tweet.inner_text()
-                        id_foto = str(hash(texto_tweet))
+                    # Cargamos la página igual que tú en tu navegador
+                    page.goto(url_directa, wait_until="domcontentloaded", timeout=40000)
+                    time.sleep(6) # Tiempo para que cargue el gráfico
+
+                    # Localizamos el primer tweet por su clase en Nitter
+                    tweet = page.locator('.timeline-item').first
+                    
+                    if tweet.count() > 0:
+                        # Creamos un ID basado en el texto para no repetir
+                        texto = tweet.inner_text()
+                        id_actual = str(hash(texto))
                         
                         log_file = f"last_id_{cuenta}.txt"
                         if os.path.exists(log_file):
                             with open(log_file, "r") as f:
-                                if f.read().strip() == id_foto:
-                                    print(f"Sin cambios en {cuenta}")
-                                    exito = True
+                                if f.read().strip() == id_actual:
+                                    print(f"Sin cambios para {cuenta}")
+                                    exito_cuenta = True
                                     continue
 
+                        # SACAR CAPTURA
                         foto_name = f"{cuenta}.png"
-                        primer_tweet.screenshot(path=foto_name)
+                        tweet.screenshot(path=foto_name)
+                        
+                        # ENVIAR
                         enviar_telegram_foto(foto_name, cuenta, f"https://x.com/{cuenta}")
                         
                         with open(log_file, "w") as f:
-                            f.write(id_foto)
-                        exito = True
-                        print(f"¡Captura lograda para {cuenta}!")
+                            f.write(id_actual)
+                        
+                        print(f"¡Captura enviada de {cuenta}!")
+                        exito_cuenta = True
                 except Exception as e:
-                    print(f"Fallo en {base_url} para {cuenta}: saltando...")
+                    print(f"Fallo en {base_url} para {cuenta}, probando siguiente espejo...")
         
         browser.close()
 
