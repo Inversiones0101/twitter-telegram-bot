@@ -17,8 +17,13 @@ def enviar_telegram_foto(foto_path, link):
         print(f"Error Telegram: {e}")
 
 def capturar():
-    # Probamos con una instancia que suele ser más rápida para cargar contenido
-    url = "https://nitter.privacydev.net/robertojirusta"
+    # LISTA DE INSTANCIAS: Si una falla, prueba la otra automáticamente
+    instancias = [
+        "https://nitter.net",
+        "https://nitter.cz",
+        "https://nitter.no-logs.com",
+        "https://nitter.privacydev.net"
+    ]
     
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -27,43 +32,43 @@ def capturar():
         )
         page = context.new_page()
 
-        try:
-            print(f"Navegando a {url}...")
-            # Subimos el tiempo de espera y usamos 'networkidle' para asegurar carga
-            page.goto(url, wait_until="networkidle", timeout=60000)
-            
-            # CAMBIO CLAVE: Esperamos específicamente al selector del tweet
-            # Si no aparece en 20 segundos, pasamos a otra instancia
-            page.wait_for_selector('.timeline-item', timeout=20000)
-            time.sleep(5) # Un respiro para que carguen los gráficos
-
-            tweet = page.locator('.timeline-item').first
-            
-            if tweet.count() > 0:
-                texto = tweet.inner_text()
-                id_actual = str(hash(texto))
+        exito = False
+        for base_url in instancias:
+            if exito: break
+            url = f"{base_url}/robertojirusta"
+            try:
+                print(f"Intentando en {base_url}...")
+                # Reducimos el tiempo de espera por intento para avanzar rápido
+                page.goto(url, wait_until="domcontentloaded", timeout=25000)
                 
-                log_file = "last_id_robertojirusta.txt"
-                if os.path.exists(log_file) and open(log_file).read().strip() == id_actual:
-                    print("Nada nuevo bajo el sol.")
-                    return
+                # Esperamos a que el tweet sea visible
+                page.wait_for_selector('.timeline-item', timeout=15000)
+                time.sleep(5) 
 
-                foto_path = "roberto.png"
-                # Forzamos a que espere a que el elemento sea visible
-                tweet.screenshot(path=foto_path)
-                
-                enviar_telegram_foto(foto_path, "https://x.com/robertojirusta")
-                
-                with open(log_file, "w") as f:
-                    f.write(id_actual)
-                print("¡BOOM! Foto enviada.")
-            else:
-                print("El servidor respondió pero el muro está vacío.")
+                tweet = page.locator('.timeline-item').first
+                if tweet.count() > 0:
+                    texto = tweet.inner_text()
+                    id_actual = str(hash(texto))
+                    
+                    log_file = "last_id_robertojirusta.txt"
+                    if os.path.exists(log_file) and open(log_file).read().strip() == id_actual:
+                        print(f"Sin cambios en {base_url}.")
+                        exito = True
+                        continue
 
-        except Exception as e:
-            print(f"Agotado el tiempo de espera: {e}")
-        finally:
-            browser.close()
+                    foto_path = "roberto.png"
+                    tweet.screenshot(path=foto_path)
+                    enviar_telegram_foto(foto_path, "https://x.com/robertojirusta")
+                    
+                    with open(log_file, "w") as f:
+                        f.write(id_actual)
+                    print(f"¡CONSEGUIDO en {base_url}!")
+                    exito = True
+            except Exception as e:
+                print(f"Fallo {base_url}: {e}")
+                continue # Si falla, el bucle prueba la siguiente instancia de la lista
+
+        browser.close()
 
 if __name__ == "__main__":
     capturar()
