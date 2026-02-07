@@ -1,9 +1,9 @@
-name: Bot Fotografo Inversiones
+name: Bot Fotografo Nitter Disfrazado
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: '*/15 * * * *' # Cada 15 minutos
+    - cron: '*/15 * * * *'
 
 jobs:
   build:
@@ -32,7 +32,7 @@ jobs:
         run: |
           git config --global user.name "BotInversiones"
           git config --global user.email "bot@inversiones.com"
-          git pull --rebase origin main # Esto evita el error de "rejected"
+          git pull --rebase origin main
           git add last_id_*.txt
           git commit -m "Actualizar memoria de capturas" || exit 0
           git push origin main
