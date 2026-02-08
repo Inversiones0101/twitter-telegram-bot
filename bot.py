@@ -2,7 +2,7 @@ import os
 import tweepy
 import requests
 
-# Lista de cuentas sugeridas por su baja frecuencia
+# Cuentas de baja frecuencia para no agotar el cupo
 CUENTAS = ["eldaminato", "NicolasCappella", "TargetDeMercado", "brujodegalileo"]
 
 def enviar_telegram(texto, imagen_url=None):
@@ -11,69 +11,56 @@ def enviar_telegram(texto, imagen_url=None):
     
     if imagen_url:
         url = f"https://api.telegram.org/bot{token}/sendPhoto"
-        payload = {'chat_id': chat_id, 'caption': texto, 'parse_mode': 'Markdown'}
         try:
             r = requests.get(imagen_url)
-            files = {'photo': r.content}
-            requests.post(url, data=payload, files=files)
+            requests.post(url, data={'chat_id': chat_id, 'caption': texto, 'parse_mode': 'Markdown'}, files={'photo': r.content})
         except:
-            pass
+            requests.post(f"https://api.telegram.org/bot{token}/sendMessage", json={'chat_id': chat_id, 'text': texto, 'parse_mode': 'Markdown'})
     else:
         url = f"https://api.telegram.org/bot{token}/sendMessage"
-        payload = {'chat_id': chat_id, 'text': texto, 'parse_mode': 'Markdown'}
-        requests.post(url, json=payload)
+        requests.post(url, json={'chat_id': chat_id, 'text': texto, 'parse_mode': 'Markdown'})
 
 def revisar_feeds():
-    # Usamos el Bearer Token de OAuth 2.0
-    bearer_token = os.getenv('X_BEARER_TOKEN')
-    client = tweepy.Client(bearer_token=bearer_token)
+    # Autenticación usando tus nombres exactos de Secrets
+    try:
+        client = tweepy.Client(
+            bearer_token=os.getenv('TWITTER_BEARER_TOKEN'),
+            consumer_key=os.getenv('TWITTER_API_KEY'),
+            consumer_secret=os.getenv('TWITTER_API_KEY_SECRET'),
+            access_token=os.getenv('TWITTER_ACCESS_TOKEN'),
+            access_token_secret=os.getenv('TWITTER_ACCESS_TOKEN_SECRET')
+        )
 
-    for usuario in CUENTAS:
-        try:
+        for usuario in CUENTAS:
             print(f"Revisando a {usuario}...")
-            # 1. Buscamos el ID del usuario
             user = client.get_user(username=usuario)
-            if not user.data:
-                continue
-            user_id = user.data.id
-
-            # 2. Obtenemos el último tweet con imágenes
+            if not user or not user.data: continue
+            
             tweets = client.get_users_tweets(
-                id=user_id, 
+                id=user.data.id, 
                 max_results=5,
                 expansions='attachments.media_keys',
-                media_fields=['url', 'preview_image_url']
+                media_fields=['url']
             )
 
-            if not tweets.data:
-                continue
+            if not tweets.data: continue
 
-            ultimo_tweet = tweets.data[0]
-            id_actual = str(ultimo_tweet.id)
-
-            # 3. Memoria por cuenta para no repetir
+            tweet = tweets.data[0]
+            id_tweet = str(tweet.id)
             log_file = f"last_id_{usuario}.txt"
-            if os.path.exists(log_file) and open(log_file).read().strip() == id_actual:
-                print(f"Sin novedades para {usuario}")
+
+            if os.path.exists(log_file) and open(log_file).read().strip() == id_tweet:
                 continue
 
-            # 4. Preparar contenido
-            texto = f"📢 *Nuevo de @{usuario}*\n\n{ultimo_tweet.text}"
-            imagen_url = None
-            
-            if tweets.includes and 'media' in tweets.includes:
-                media = tweets.includes['media'][0]
-                imagen_url = media.url if media.url else media.preview_image_url
+            img = tweets.includes['media'][0].url if tweets.includes and 'media' in tweets.includes else None
+            enviar_telegram(f"📢 *Nuevo de @{usuario}*\n\n{tweet.text}", img)
 
-            enviar_telegram(texto, imagen_url)
-
-            # 5. Guardar en memoria
             with open(log_file, "w") as f:
-                f.write(id_actual)
-            print(f"¡Tweet de {usuario} enviado!")
+                f.write(id_tweet)
+            print(f"✅ {usuario} enviado.")
 
-        except Exception as e:
-            print(f"Error con {usuario}: {e}")
+    except Exception as e:
+        print(f"Error de autenticación: {e}")
 
 if __name__ == "__main__":
     revisar_feeds()
