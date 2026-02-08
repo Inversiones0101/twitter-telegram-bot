@@ -3,7 +3,7 @@ name: Bot Twitter API Profesional
 on:
   workflow_dispatch:
   schedule:
-    - cron: '*/30 * * * *' # Lo bajamos a cada 30 min para ser más discretos con la API
+    - cron: '*/30 * * * *' # Se ejecuta cada 30 minutos
 
 jobs:
   build:
@@ -23,9 +23,14 @@ jobs:
 
       - name: Run Bot
         env:
+          # Sincronizado con tus nombres de Secrets en GitHub
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
+          TWITTER_BEARER_TOKEN: ${{ secrets.TWITTER_BEARER_TOKEN }}
+          TWITTER_API_KEY: ${{ secrets.TWITTER_API_KEY }}
+          TWITTER_API_KEY_SECRET: ${{ secrets.TWITTER_API_KEY_SECRET }}
+          TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
+          TWITTER_ACCESS_TOKEN_SECRET: ${{ secrets.TWITTER_ACCESS_TOKEN_SECRET }}
         run: python bot.py
 
       - name: Save memory
@@ -33,7 +38,7 @@ jobs:
           git config --global user.name "BotInversiones"
           git config --global user.email "bot@inversiones.com"
           git pull --rebase origin main
-          # Esta línea evita el error si no hay archivos .txt aún
+          # Creamos un archivo base para que 'git add' no falle si no hay nuevos .txt
           touch last_id_inicio.txt 
           git add last_id_*.txt
           git commit -m "Actualizar memoria de API" || exit 0
