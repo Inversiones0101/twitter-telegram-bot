@@ -1,9 +1,9 @@
-name: Bot Fotografo Nitter Disfrazado
+name: Bot Twitter API Profesional
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: '*/15 * * * *'
+    - cron: '*/30 * * * *' # Lo bajamos a cada 30 min para ser más discretos con la API
 
 jobs:
   build:
@@ -19,13 +19,13 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install requests playwright
-          playwright install chromium
+          pip install requests tweepy
 
       - name: Run Bot
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
         run: python bot.py
 
       - name: Save memory
@@ -34,5 +34,5 @@ jobs:
           git config --global user.email "bot@inversiones.com"
           git pull --rebase origin main
           git add last_id_*.txt
-          git commit -m "Actualizar memoria de capturas" || exit 0
+          git commit -m "Actualizar memoria de API" || exit 0
           git push origin main
