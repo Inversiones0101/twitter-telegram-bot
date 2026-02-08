@@ -33,6 +33,8 @@ jobs:
           git config --global user.name "BotInversiones"
           git config --global user.email "bot@inversiones.com"
           git pull --rebase origin main
+          # Esta línea evita el error si no hay archivos .txt aún
+          touch last_id_inicio.txt 
           git add last_id_*.txt
           git commit -m "Actualizar memoria de API" || exit 0
           git push origin main
