@@ -4,18 +4,14 @@ import requests
 import time
 import re
 
-# --- FUENTES CORREGIDAS ---
 FEEDS = {
     "TRENDSPIDER_BSKY": "https://bsky.app/profile/trendspider.com/rss",
     "STOCK_CONSULTANT": "https://www.stockconsultant.com/consultant/rss.cgi"
 }
 
 def extraer_imagen_premium(entrada):
-    # 1. Buscar en media_content o enclosures
     if 'media_content' in entrada: return entrada.media_content[0]['url']
     if 'enclosures' in entrada and entrada.enclosures: return entrada.enclosures[0]['url']
-    
-    # 2. Buscar en el texto (StockConsultant)
     content = entrada.get('summary', '') + entrada.get('description', '')
     img_match = re.search(r'src="([^"]+)"', content)
     if img_match:
@@ -26,21 +22,20 @@ def extraer_imagen_premium(entrada):
 def enviar_telegram(titulo, link, image_url, fuente):
     token = os.getenv('TELEGRAM_BOT_TOKEN')
     chat_id = os.getenv('TELEGRAM_CHAT_ID')
-    # Manejo de error si el título no existe (el error que vimos en el log)
-    txt_titulo = titulo if titulo else "Análisis Técnico Nuevo"
+    txt_titulo = (titulo or "Nuevo Gráfico Técnico").strip()
     caption = f"🎯 *{fuente}*\n━━━━━━━━━━━━━━\n📝 {txt_titulo}\n\n🔗 [Ver análisis]({link})"
     
     try:
         if image_url:
             url = f"https://api.telegram.org/bot{token}/sendPhoto"
-            requests.post(url, json={'chat_id': chat_id, 'photo': image_url, 'caption': caption, 'parse_mode': 'Markdown'}, timeout=20)
+            requests.post(url, json={'chat_id': chat_id, 'photo': image_url, 'caption': caption, 'parse_mode': 'Markdown'}, timeout=30)
         else:
             url = f"https://api.telegram.org/bot{token}/sendMessage"
-            requests.post(url, json={'chat_id': chat_id, 'text': caption, 'parse_mode': 'Markdown'}, timeout=15)
+            requests.post(url, json={'chat_id': chat_id, 'text': caption, 'parse_mode': 'Markdown', 'disable_web_page_preview': False}, timeout=20)
     except: pass
 
 def main():
-    print("🚀 Iniciando Radar de Emergencia Final...")
+    print("🚀 Radar Tanque: Barrido en orden cronológico...")
     archivo_h = "last_id_inicio.txt"
     if not os.path.exists(archivo_h):
         with open(archivo_h, "w") as f: f.write("")
@@ -56,21 +51,20 @@ def main():
             
             if resp.status_code == 200:
                 feed = feedparser.parse(resp.content)
-                for entrada in feed.entries[:2]:
-                    # Usamos .get() para evitar el error 'no attribute title'
-                    link = entrada.get('link', '')
+                # TRUCO: .reversed() para que mande la más vieja primero y la nueva quede abajo
+                for entrada in reversed(feed.entries[:3]):
+                    link = entrada.get('link')
                     if link and link not in historial:
-                        print(f"✨ Procesando novedad en {nombre}")
-                        # Intentamos sacar el título de varias formas
-                        titulo = entrada.get('title') or entrada.get('description', '')[:50]
+                        print(f"✨ ¡Capturado! {nombre}")
+                        titulo = entrada.get('title') or (entrada.get('description', '')[:70] + "...")
                         img = extraer_imagen_premium(entrada)
                         enviar_telegram(titulo, link, img, nombre)
                         
                         with open(archivo_h, "a") as f: f.write(link + "\n")
                         historial.add(link)
-                        time.sleep(2)
+                        time.sleep(3)
             else:
-                print(f"❌ {nombre} devolvió error {resp.status_code}")
+                print(f"❌ {nombre} bloqueó la conexión (Código {resp.status_code})")
         except Exception as e:
             print(f"⚠️ Error en {nombre}: {e}")
 
