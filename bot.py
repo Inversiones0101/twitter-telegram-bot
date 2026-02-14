@@ -3,59 +3,72 @@ import feedparser
 import requests
 import time
 
-# --- FUENTES TÉCNICAS USA & ARG ---
+# --- FUENTES 100% GRÁFICAS (Sacamos Ámbito por ahora porque solo manda billetes) ---
 FEEDS = {
-    "Ambito_Finanzas": "https://www.ambito.com/rss/pages/finanzas.xml",
-    "StockConsultant_USA": "https://www.stockconsultant.com/consultant/rss.cgi",
-    "Investing_Argentina": "https://es.investing.com/rss/market_overview_Argentina.rss",
-    "Investing_Tecnico_USA": "https://es.investing.com/rss/market_overview_technical.rss"
+    "STOCK_CONSULTANT": "https://www.stockconsultant.com/consultant/rss.cgi", # Gráficos USA
+    "RAVA_MERVAL": "https://www.rava.com/rss.php", # El panel de Argentina
+    "INVESTING_TECNICO": "https://es.investing.com/rss/market_overview_technical.rss" # Velas Japonesas
 }
 
 def enviar_telegram(titulo, link, image_url, fuente):
     token = os.getenv('TELEGRAM_BOT_TOKEN')
     chat_id = os.getenv('TELEGRAM_CHAT_ID')
-    caption = f"📊 *{fuente.upper()}*\n━━━━━━━━━━━━━━\n📝 {titulo}\n\n🔗 [Ver análisis]({link})"
+    
+    # Si la imagen es del billete de 100 de Ámbito, la ignoramos para buscar una mejor
+    if image_url and "ambito.com" in image_url and "dolar" in image_url:
+        image_url = None
+
+    caption = f"📊 *{fuente}*\n━━━━━━━━━━━━━━\n📝 {titulo}\n\n🔗 [Ver Gráfico Completo]({link})"
     
     try:
         if image_url:
-            # Intentamos enviar con foto
             url = f"https://api.telegram.org/bot{token}/sendPhoto"
             payload = {'chat_id': chat_id, 'photo': image_url, 'caption': caption, 'parse_mode': 'Markdown'}
-            r = requests.post(url, json=payload, timeout=10)
-            if r.status_code == 200: return
-            
-        # Si no hay imagen o falló, enviamos solo texto para no perder la noticia
-        url = f"https://api.telegram.org/bot{token}/sendMessage"
-        payload = {'chat_id': chat_id, 'text': caption, 'parse_mode': 'Markdown', 'disable_web_page_preview': False}
+        else:
+            url = f"https://api.telegram.org/bot{token}/sendMessage"
+            payload = {'chat_id': chat_id, 'text': caption, 'parse_mode': 'Markdown', 'disable_web_page_preview': False}
+        
         requests.post(url, json=payload, timeout=10)
-    except Exception as e:
-        print(f"Error en {fuente}: {e}")
+    except: pass
 
 def main():
-    print("🚀 Iniciando radar financiero...")
+    print("🚀 Iniciando radar sin repeticiones...")
+    # El truco para no repetir: GitHub Actions necesita que el historial sea persistente
     archivo_h = "last_id_inicio.txt"
-    historial = open(archivo_h, "r").read().splitlines() if os.path.exists(archivo_h) else []
+    
+    if os.path.exists(archivo_h):
+        with open(archivo_h, "r") as f:
+            historial = set(f.read().splitlines())
+    else:
+        historial = set()
+
+    nuevas_noticias = []
 
     for nombre, url in FEEDS.items():
         try:
-            print(f"🔍 Revisando {nombre}...")
-            # Usamos headers para que no nos bloqueen
             resp = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=15)
             feed = feedparser.parse(resp.content)
             
-            for entrada in feed.entries[:3]: # Traemos los últimos 3 de cada uno
+            for entrada in feed.entries[:3]:
                 if entrada.link not in historial:
-                    # Extraer imagen (investing usa 'enclosures')
+                    print(f"✨ Nueva noticia técnica en {nombre}")
+                    
+                    # Buscamos la imagen en la etiqueta correcta (enclosure)
                     img = None
                     if 'enclosures' in entrada and entrada.enclosures:
                         img = entrada.enclosures[0]['url']
                     
                     enviar_telegram(entrada.title, entrada.link, img, nombre)
-                    with open(archivo_h, "a") as f: f.write(entrada.link + "\n")
+                    historial.add(entrada.link)
+                    nuevas_noticias.append(entrada.link)
                     time.sleep(2)
         except:
-            print(f"⚠️ {nombre} lento, saltando...")
-    print("✅ Radar completado.")
+            print(f"⚠️ Error en {nombre}")
+
+    # Guardamos el historial actualizado
+    with open(archivo_h, "w") as f:
+        for link in historial:
+            f.write(link + "\n")
 
 if __name__ == "__main__":
     main()
