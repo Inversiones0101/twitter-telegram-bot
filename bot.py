@@ -4,24 +4,24 @@ import requests
 import time
 import re
 
-# --- CONFIGURACIÓN ---
+# --- FUENTES RE-DIRECCIONADAS ---
 FEEDS = {
-    "TRENDSPIDER_BSKY": "https://rss.blue/user/trendspider.com",
+    # Usamos un puente alternativo para BlueSky (más estable)
+    "TRENDSPIDER_BSKY": "https://bsky.app/profile/trendspider.com/rss", 
     "STOCK_CONSULTANT": "https://www.stockconsultant.com/consultant/rss.cgi"
 }
 
 def extraer_imagen_premium(entrada):
-    # 1. Prioridad absoluta a imágenes de BlueSky/TrendSpider
-    if 'media_content' in entrada:
-        return entrada.media_content[0]['url']
+    # 1. Buscar imagen en los campos estándar de RSS
+    if 'media_content' in entrada: return entrada.media_content[0]['url']
+    if 'enclosures' in entrada and entrada.enclosures: return entrada.enclosures[0]['url']
     
-    # 2. Búsqueda en el cuerpo del mensaje (StockConsultant)
+    # 2. Búsqueda manual en el texto (StockConsultant)
     content = entrada.get('summary', '') + entrada.get('description', '')
     img_match = re.search(r'src="([^"]+)"', content)
     if img_match:
         url = img_match.group(1)
         return 'https:' + url if url.startswith('//') else url
-    
     return None
 
 def enviar_telegram(titulo, link, image_url, fuente):
@@ -32,30 +32,16 @@ def enviar_telegram(titulo, link, image_url, fuente):
     try:
         if image_url:
             url = f"https://api.telegram.org/bot{token}/sendPhoto"
-            payload = {'chat_id': chat_id, 'photo': image_url, 'caption': caption, 'parse_mode': 'Markdown'}
-            r = requests.post(url, json=payload, timeout=30)
-            if r.status_code == 200: return
-
-        # Si no hay foto o falla, enviamos texto
-        url = f"https://api.telegram.org/bot{token}/sendMessage"
-        payload = {'chat_id': chat_id, 'text': caption, 'parse_mode': 'Markdown', 'disable_web_page_preview': False}
-        requests.post(url, json=payload, timeout=20)
-    except: pass
-
-def obtener_feed_con_reintentos(url, max_intentos=3):
-    """Intenta conectar varias veces si el servidor está saturado"""
-    for i in range(max_intentos):
-        try:
-            resp = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=35)
-            if resp.status_code == 200:
-                return feedparser.parse(resp.content)
-        except:
-            print(f"⏳ Intento {i+1} fallido, esperando...")
-            time.sleep(10)
-    return None
+            # Si la imagen es muy grande, Telegram puede tardar, bajamos el timeout a 15s pero con retry
+            requests.post(url, json={'chat_id': chat_id, 'photo': image_url, 'caption': caption, 'parse_mode': 'Markdown'}, timeout=20)
+        else:
+            url = f"https://api.telegram.org/bot{token}/sendMessage"
+            requests.post(url, json={'chat_id': chat_id, 'text': caption, 'parse_mode': 'Markdown'}, timeout=15)
+    except:
+        pass
 
 def main():
-    print("🚀 Iniciando Radar con Reintentos...")
+    print("🚀 Iniciando Radar de Emergencia...")
     archivo_h = "last_id_inicio.txt"
     if not os.path.exists(archivo_h):
         with open(archivo_h, "w") as f: f.write("")
@@ -64,24 +50,27 @@ def main():
         historial = set(f.read().splitlines())
 
     for nombre, url in FEEDS.items():
-        print(f"🔍 Escaneando {nombre}...")
-        feed = obtener_feed_con_reintentos(url)
-        
-        if feed and feed.entries:
-            for entrada in feed.entries[:2]:
-                if entrada.link not in historial:
-                    print(f"✨ ¡Capturando novedad en {nombre}!")
-                    img = extraer_imagen_premium(entrada)
-                    enviar_telegram(entrada.title, entrada.link, img, nombre)
-                    
-                    with open(archivo_h, "a") as f:
-                        f.write(entrada.link + "\n")
-                    historial.add(entrada.link)
-                    time.sleep(5)
-                else:
-                    print(f"⏩ {nombre}: Ya procesado.")
-        else:
-            print(f"⚠️ No se pudo conectar con {nombre} tras varios intentos.")
+        try:
+            print(f"🔍 Conectando a {nombre}...")
+            # Usamos un User-Agent de navegador real para que no nos bloqueen
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36'}
+            resp = requests.get(url, headers=headers, timeout=30)
+            
+            if resp.status_code == 200:
+                feed = feedparser.parse(resp.content)
+                for entrada in feed.entries[:2]:
+                    if entrada.link not in historial:
+                        print(f"✨ ¡Bingo! Noticia encontrada en {nombre}")
+                        img = extraer_imagen_premium(entrada)
+                        enviar_telegram(entrada.title, entrada.link, img, nombre)
+                        
+                        with open(archivo_h, "a") as f: f.write(entrada.link + "\n")
+                        historial.add(entrada.link)
+                        time.sleep(2)
+            else:
+                print(f"❌ {nombre} devolvió error {resp.status_code}")
+        except Exception as e:
+            print(f"⚠️ Error de conexión en {nombre}: {e}")
 
 if __name__ == "__main__":
     main()
