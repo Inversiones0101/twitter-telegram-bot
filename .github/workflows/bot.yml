@@ -2,13 +2,15 @@ name: Bot de Noticias Financieras Pro
 
 on:
   schedule:
-    # Se ejecuta cada 15 minutos
+    # Se ejecuta cada 15 minutos para atrapar los gráficos rápido
     - cron: '*/15 * * * *'
-  workflow_dispatch: # Permite ejecutarlo manualmente desde la pestaña Actions
+  workflow_dispatch: # Botón verde de "Run workflow"
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Tiempo límite de 5 minutos para que no gaste tus minutos de GitHub
+    timeout-minutes: 5 
 
     steps:
     - name: Checkout del código
@@ -26,9 +28,7 @@ jobs:
 
     - name: Ejecutar el Bot
       env:
-        # Configuración de secretos de Telegram
         TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        # Seteamos la zona horaria a nivel sistema para el bot
         TZ: 'America/Argentina/Buenos_Aires'
       run: python bot.py
