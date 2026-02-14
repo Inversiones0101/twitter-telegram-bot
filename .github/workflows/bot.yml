@@ -37,7 +37,11 @@ jobs:
       run: |
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
+        # Este comando crea el archivo si no existe para evitar el error de ayer
+        touch last_id_inicio.txt 
         git add last_id_inicio.txt
-        git commit -m "Actualizar historial de noticias [skip ci]" || echo "Sin cambios"
+        git commit -m "Actualizar historial [skip ci]" || echo "Sin cambios para commitear"
         git push
+
+        
         
