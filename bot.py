@@ -2,103 +2,64 @@ import os
 import feedparser
 import requests
 import time
-from datetime import datetime
 
-# --- CONFIGURACIÓN DE FUENTES ---
-# Usamos rss.blue para convertir perfiles de BlueSky a RSS
+# --- FUENTES 100% VISUALES Y TÉCNICAS ---
 FEEDS = {
-    "Barchart": "https://www.barchart.com/news/authors/rss",
-    "El Economista": "https://eleconomista.com.ar/finanzas/feed/",
-    "TrendSpider": "https://rss.blue/user/trendspider.com",
-    "BOA": "https://rss.blue/user/boa.com.ar"
+    "TrendSpider_USA": "https://rss.blue/user/trendspider.com",
+    "BOA_Arg_Bonos": "https://rss.blue/user/boa.com.ar",
+    "Merval_Tecnico": "https://rss.blue/user/alfredovictor.bsky.social",
+    "Investing_Tecnico": "https://es.investing.com/rss/market_overview_technical.rss"
 }
 
-# --- FUNCIONES DE TELEGRAM ---
-def enviar_a_telegram(titulo, link, image_url, fuente):
+def enviar_telegram(titulo, link, image_url, fuente):
     token = os.getenv('TELEGRAM_BOT_TOKEN')
     chat_id = os.getenv('TELEGRAM_CHAT_ID')
     
-    # Estética estilo "Fixup" / Pro
-    caption = (
-        f"📊 *{fuente.upper()}*\n"
-        f"━━━━━━━━━━━━━━━━━━\n"
-        f"📝 {titulo}\n\n"
-        f"🔗 [Ver análisis completo]({link})"
-    )
+    # Diseño limpio para que el gráfico destaque
+    caption = f"📈 *{fuente.upper()}*\n\n{titulo}\n\n🔗 [Ver análisis]({link})"
     
     if image_url:
         url = f"https://api.telegram.org/bot{token}/sendPhoto"
         payload = {'chat_id': chat_id, 'photo': image_url, 'caption': caption, 'parse_mode': 'Markdown'}
     else:
+        # Si no hay imagen, mandamos mensaje con vista previa de link
         url = f"https://api.telegram.org/bot{token}/sendMessage"
         payload = {'chat_id': chat_id, 'text': caption, 'parse_mode': 'Markdown', 'disable_web_page_preview': False}
     
-    try:
-        r = requests.post(url, json=payload)
-        r.raise_for_status()
-    except Exception as e:
-        print(f"Error enviando a Telegram: {e}")
+    requests.post(url, json=payload)
 
-# --- UTILIDADES ---
 def extraer_imagen(entrada):
-    """Busca imágenes en diferentes formatos de RSS"""
-    # 1. Buscar en media_content (BlueSky/TrendSpider)
+    # Lógica específica para capturar fotos de BlueSky y Investing
     if 'media_content' in entrada:
         return entrada.media_content[0]['url']
-    # 2. Buscar en enclosures (WordPress/El Economista)
     if 'enclosures' in entrada and entrada.enclosures:
         return entrada.enclosures[0]['url']
-    # 3. Buscar en el contenido (algunos RSS de Barchart)
-    if 'summary' in entrada and '<img src="' in entrada.summary:
-        return entrada.summary.split('<img src="')[1].split('"')[0]
     return None
 
-def gestionar_historial(url_noticia):
-    """Evita enviar la misma noticia dos veces"""
-    archivo_historial = "last_id_inicio.txt"
-    if not os.path.exists(archivo_historial):
-        open(archivo_historial, 'w').close()
-    
-    with open(archivo_historial, 'r') as f:
-        historial = f.read().splitlines()
-    
-    if url_noticia in historial:
-        return False # Ya se envió
-    
-    # Guardar nueva URL (mantenemos las últimas 50 para no llenar el archivo)
-    historial.append(url_noticia)
-    with open(archivo_historial, 'w') as f:
-        f.write("\n".join(historial[-50:]))
-    return True
-
-def chequear_rava():
-    """Alerta especial para el programa en vivo"""
-    ahora = datetime.now()
-    # Lunes a Viernes a las 09:45 (ajusta según la hora de tu servidor GitHub)
-    if ahora.weekday() < 5 and ahora.hour == 9 and ahora.minute == 45:
-        msg = "📺 *RAVA BURSÁTIL*\n🔔 ¡Comienza 'La Mañana del Mercado' en vivo!\n\n🔗 [Ver en YouTube](https://www.youtube.com/@RavaBursatil/live)"
-        enviar_a_telegram("¡Programa en Vivo!", "https://www.youtube.com/@RavaBursatil/live", None, "RAVA")
-
-# --- FLUJO PRINCIPAL ---
 def main():
-    print("Iniciando revisión de mercados...")
-    
+    # Usamos un set para el historial en memoria durante la ejecución
+    if not os.path.exists("last_id_inicio.txt"):
+        open("last_id_inicio.txt", "w").close()
+
+    with open("last_id_inicio.txt", "r") as f:
+        historial = set(f.read().splitlines())
+
+    nuevas_urls = []
+
     for nombre, url in FEEDS.items():
-        print(f"Chequeando {nombre}...")
         feed = feedparser.parse(url)
-        
-        # Revisamos las 3 entradas más recientes de cada fuente
-        for entrada in feed.entries[:3]:
-            link = entrada.link
-            
-            if gestionar_historial(link):
-                titulo = entrada.title
+        for entrada in feed.entries[:5]: # Miramos las últimas 5
+            if entrada.link not in historial:
+                print(f"Nueva entrada en {nombre}")
                 imagen = extraer_imagen(entrada)
-                enviar_a_telegram(titulo, link, imagen, nombre)
-                time.sleep(2) # Pausa breve para evitar spam
-    
-    chequear_rava()
-    print("Proceso finalizado.")
+                enviar_telegram(entrada.title, entrada.link, imagen, nombre)
+                nuevas_urls.append(entrada.link)
+                time.sleep(2)
+
+    # Guardar en el archivo para no repetir mañana
+    with open("last_id_inicio.txt", "a") as f:
+        for url in nuevas_urls:
+            f.write(url + "\n")
 
 if __name__ == "__main__":
     main()
