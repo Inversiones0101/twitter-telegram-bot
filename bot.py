@@ -5,6 +5,7 @@ import time
 
 # --- FUENTES TÉCNICAS USA & ARG ---
 FEEDS = {
+    "Ambito_Finanzas": "https://www.ambito.com/rss/pages/finanzas.xml",
     "StockConsultant_USA": "https://www.stockconsultant.com/consultant/rss.cgi",
     "Investing_Argentina": "https://es.investing.com/rss/market_overview_Argentina.rss",
     "Investing_Tecnico_USA": "https://es.investing.com/rss/market_overview_technical.rss"
