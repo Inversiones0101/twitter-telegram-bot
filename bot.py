@@ -21,18 +21,40 @@ def enviar_telegram(titulo, link, image_url, fuente):
     token = os.getenv('TELEGRAM_BOT_TOKEN')
     chat_id = os.getenv('TELEGRAM_CHAT_ID')
     
-    txt_titulo = (titulo or "Actualización de Mercado").strip()
-    caption = f"🎯 *{fuente}*\n━━━━━━━━━━━━━━\n📝 {txt_titulo}\n\n🔗 [Ver análisis completo]({link})"
+    # Limpiamos el título para que no sea eterno
+    txt_titulo = (titulo or "Análisis de Mercado").strip()
+    
+    # Armamos un mensaje minimalista: Título y la fuente
+    caption = f"🎯 *{fuente}*\n━━━━━━━━━━━━━━\n📝 {txt_titulo}"
     
     try:
         if image_url:
             url = f"https://api.telegram.org/bot{token}/sendPhoto"
-            requests.post(url, json={'chat_id': chat_id, 'photo': image_url, 'caption': caption, 'parse_mode': 'Markdown'}, timeout=30)
+            payload = {
+                'chat_id': chat_id,
+                'photo': image_url,
+                'caption': caption,
+                'parse_mode': 'Markdown'
+            }
+            # Si mandamos foto, Telegram permite clickearla para ir al link si la envolvemos
+            # Pero para máxima limpieza, mandamos la foto con el link oculto en el título
+            caption_con_link = f"🎯 *[{fuente}]({link})*\n━━━━━━━━━━━━━━\n📝 {txt_titulo}"
+            payload['caption'] = caption_con_link
+            
+            requests.post(url, json=payload, timeout=30)
         else:
+            # Si no hay foto, mandamos texto pero APAGAMOS la previsualización
             url = f"https://api.telegram.org/bot{token}/sendMessage"
-            requests.post(url, json={'chat_id': chat_id, 'text': caption, 'parse_mode': 'Markdown', 'disable_web_page_preview': False}, timeout=20)
-    except: pass
-
+            payload = {
+                'chat_id': chat_id,
+                'text': caption + f"\n\n🔗 [Ver análisis]({link})",
+                'parse_mode': 'Markdown',
+                'disable_web_page_preview': True  # <-- LA CLAVE DEL ÉXITO
+            }
+            requests.post(url, json=payload, timeout=20)
+    except:
+        pass
+        
 def main():
     print("🚀 Radar Dúo Dinámico: TrendSpider + Barchart...")
     archivo_h = "last_id_inicio.txt"
