@@ -2,7 +2,6 @@ import os
 import feedparser
 import requests
 import time
-import re
 
 # --- EL NUEVO DÚO DINÁMICO ---
 FEEDS = {
@@ -21,31 +20,30 @@ def enviar_telegram(titulo, link, image_url, fuente):
     token = os.getenv('TELEGRAM_BOT_TOKEN')
     chat_id = os.getenv('TELEGRAM_CHAT_ID')
     
-    # Título limpio sin el texto cortado que vimos en $HOOD
+    # Título prolijo
     txt_titulo = (titulo or "Análisis de Mercado").strip()
     
-    # El link ahora está integrado en el nombre de la fuente. ¡Elegancia total!
-    caption = f"🎯 *[{fuente}]({link})*\n━━━━━━━━━━━━━━\n📝 {txt_titulo}"
+    # USAMOS HTML: El link se esconde dentro del nombre de la fuente
+    # Esto evita que aparezca la URL larga entre paréntesis.
+    caption_html = f"🎯 <b><a href='{link}'>{fuente}</a></b>\n━━━━━━━━━━━━━━\n📝 {txt_titulo}"
     
     try:
-        # Si detectamos una imagen (como el gráfico de $META), la enviamos
         if image_url:
             url = f"https://api.telegram.org/bot{token}/sendPhoto"
             payload = {
                 'chat_id': chat_id,
                 'photo': image_url,
-                'caption': caption,
-                'parse_mode': 'Markdown'
+                'caption': caption_html,
+                'parse_mode': 'HTML' # HTML es más robusto para links
             }
             requests.post(url, json=payload, timeout=30)
         else:
-            # Si no hay imagen (como pasó con $HOOD), mandamos solo texto limpio
             url = f"https://api.telegram.org/bot{token}/sendMessage"
             payload = {
                 'chat_id': chat_id,
-                'text': caption,
-                'parse_mode': 'Markdown',
-                'disable_web_page_preview': True # <-- CHAU REPETICIONES
+                'text': caption_html,
+                'parse_mode': 'HTML',
+                'disable_web_page_preview': True # Chau repeticiones grises
             }
             requests.post(url, json=payload, timeout=20)
     except Exception as e:
@@ -69,7 +67,7 @@ def main():
             
             if resp.status_code == 200:
                 feed = feedparser.parse(resp.content)
-                # Invertimos para que el orden en Telegram sea cronológico
+                # Invertimos para orden cronológico en Telegram
                 for entrada in reversed(feed.entries[:3]):
                     link = entrada.get('link')
                     if link and link not in historial:
