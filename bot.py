@@ -21,13 +21,14 @@ def enviar_telegram(titulo, link, image_url, fuente):
     token = os.getenv('TELEGRAM_BOT_TOKEN')
     chat_id = os.getenv('TELEGRAM_CHAT_ID')
     
-    # Limpiamos el título para que no sea eterno
+    # Título limpio sin el texto cortado que vimos en $HOOD
     txt_titulo = (titulo or "Análisis de Mercado").strip()
     
-    # Armamos un mensaje minimalista: Título y la fuente
-    caption = f"🎯 *{fuente}*\n━━━━━━━━━━━━━━\n📝 {txt_titulo}"
+    # El link ahora está integrado en el nombre de la fuente. ¡Elegancia total!
+    caption = f"🎯 *[{fuente}]({link})*\n━━━━━━━━━━━━━━\n📝 {txt_titulo}"
     
     try:
+        # Si detectamos una imagen (como el gráfico de $META), la enviamos
         if image_url:
             url = f"https://api.telegram.org/bot{token}/sendPhoto"
             payload = {
@@ -36,24 +37,19 @@ def enviar_telegram(titulo, link, image_url, fuente):
                 'caption': caption,
                 'parse_mode': 'Markdown'
             }
-            # Si mandamos foto, Telegram permite clickearla para ir al link si la envolvemos
-            # Pero para máxima limpieza, mandamos la foto con el link oculto en el título
-            caption_con_link = f"🎯 *[{fuente}]({link})*\n━━━━━━━━━━━━━━\n📝 {txt_titulo}"
-            payload['caption'] = caption_con_link
-            
             requests.post(url, json=payload, timeout=30)
         else:
-            # Si no hay foto, mandamos texto pero APAGAMOS la previsualización
+            # Si no hay imagen (como pasó con $HOOD), mandamos solo texto limpio
             url = f"https://api.telegram.org/bot{token}/sendMessage"
             payload = {
                 'chat_id': chat_id,
-                'text': caption + f"\n\n🔗 [Ver análisis]({link})",
+                'text': caption,
                 'parse_mode': 'Markdown',
-                'disable_web_page_preview': True  # <-- LA CLAVE DEL ÉXITO
+                'disable_web_page_preview': True # <-- CHAU REPETICIONES
             }
             requests.post(url, json=payload, timeout=20)
-    except:
-        pass
+    except Exception as e:
+        print(f"Error enviando a Telegram: {e}")
         
 def main():
     print("🚀 Radar Dúo Dinámico: TrendSpider + Barchart...")
