@@ -4,26 +4,25 @@ import requests
 import time
 import re
 
+# --- EL NUEVO DÚO DINÁMICO ---
 FEEDS = {
     "TRENDSPIDER_BSKY": "https://bsky.app/profile/trendspider.com/rss",
-    "STOCK_CONSULTANT": "https://www.stockconsultant.com/consultant/rss.cgi"
+    "BARCHART_BSKY": "https://bsky.app/profile/barchart.com/rss"
 }
 
 def extraer_imagen_premium(entrada):
+    # Prioridad 1: Media content (imágenes nativas de BlueSky)
     if 'media_content' in entrada: return entrada.media_content[0]['url']
+    # Prioridad 2: Enclosures (adjuntos de feed)
     if 'enclosures' in entrada and entrada.enclosures: return entrada.enclosures[0]['url']
-    content = entrada.get('summary', '') + entrada.get('description', '')
-    img_match = re.search(r'src="([^"]+)"', content)
-    if img_match:
-        url = img_match.group(1)
-        return 'https:' + url if url.startswith('//') else url
     return None
 
 def enviar_telegram(titulo, link, image_url, fuente):
     token = os.getenv('TELEGRAM_BOT_TOKEN')
     chat_id = os.getenv('TELEGRAM_CHAT_ID')
-    txt_titulo = (titulo or "Nuevo Gráfico Técnico").strip()
-    caption = f"🎯 *{fuente}*\n━━━━━━━━━━━━━━\n📝 {txt_titulo}\n\n🔗 [Ver análisis]({link})"
+    
+    txt_titulo = (titulo or "Actualización de Mercado").strip()
+    caption = f"🎯 *{fuente}*\n━━━━━━━━━━━━━━\n📝 {txt_titulo}\n\n🔗 [Ver análisis completo]({link})"
     
     try:
         if image_url:
@@ -35,8 +34,9 @@ def enviar_telegram(titulo, link, image_url, fuente):
     except: pass
 
 def main():
-    print("🚀 Radar Tanque: Barrido en orden cronológico...")
+    print("🚀 Radar Dúo Dinámico: TrendSpider + Barchart...")
     archivo_h = "last_id_inicio.txt"
+    
     if not os.path.exists(archivo_h):
         with open(archivo_h, "w") as f: f.write("")
 
@@ -45,17 +45,17 @@ def main():
 
     for nombre, url in FEEDS.items():
         try:
-            print(f"🔍 Conectando a {nombre}...")
+            print(f"🔍 Escaneando {nombre}...")
             headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0'}
             resp = requests.get(url, headers=headers, timeout=30)
             
             if resp.status_code == 200:
                 feed = feedparser.parse(resp.content)
-                # TRUCO: .reversed() para que mande la más vieja primero y la nueva quede abajo
+                # Invertimos para que el orden en Telegram sea cronológico
                 for entrada in reversed(feed.entries[:3]):
                     link = entrada.get('link')
                     if link and link not in historial:
-                        print(f"✨ ¡Capturado! {nombre}")
+                        print(f"✨ ¡Nuevo posteo en {nombre}!")
                         titulo = entrada.get('title') or (entrada.get('description', '')[:70] + "...")
                         img = extraer_imagen_premium(entrada)
                         enviar_telegram(titulo, link, img, nombre)
@@ -64,7 +64,7 @@ def main():
                         historial.add(link)
                         time.sleep(3)
             else:
-                print(f"❌ {nombre} bloqueó la conexión (Código {resp.status_code})")
+                print(f"❌ {nombre} falló (Código {resp.status_code})")
         except Exception as e:
             print(f"⚠️ Error en {nombre}: {e}")
 
