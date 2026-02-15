@@ -20,11 +20,10 @@ def enviar_telegram(titulo, link, image_url, fuente):
     token = os.getenv('TELEGRAM_BOT_TOKEN')
     chat_id = os.getenv('TELEGRAM_CHAT_ID')
     
-    # Título prolijo
-    txt_titulo = (titulo or "Análisis de Mercado").strip()
+    txt_titulo = (titulo or "Análisis").strip()
     
-    # USAMOS HTML: El link se esconde dentro del nombre de la fuente
-    # Esto evita que aparezca la URL larga entre paréntesis.
+    # La magia del HTML: El link queda oculto en el nombre de la fuente
+    # Ej: BARCHART_BSKY aparecerá en azul y te llevará a BlueSky
     caption_html = f"🎯 <b><a href='{link}'>{fuente}</a></b>\n━━━━━━━━━━━━━━\n📝 {txt_titulo}"
     
     try:
@@ -34,7 +33,7 @@ def enviar_telegram(titulo, link, image_url, fuente):
                 'chat_id': chat_id,
                 'photo': image_url,
                 'caption': caption_html,
-                'parse_mode': 'HTML' # HTML es más robusto para links
+                'parse_mode': 'HTML' # <--- CAMBIO CLAVE
             }
             requests.post(url, json=payload, timeout=30)
         else:
@@ -42,12 +41,12 @@ def enviar_telegram(titulo, link, image_url, fuente):
             payload = {
                 'chat_id': chat_id,
                 'text': caption_html,
-                'parse_mode': 'HTML',
-                'disable_web_page_preview': True # Chau repeticiones grises
+                'parse_mode': 'HTML', # <--- CAMBIO CLAVE
+                'disable_web_page_preview': True
             }
             requests.post(url, json=payload, timeout=20)
     except Exception as e:
-        print(f"Error enviando a Telegram: {e}")
+        print(f"Error en Telegram: {e}")
         
 def main():
     print("🚀 Radar Dúo Dinámico: TrendSpider + Barchart...")
