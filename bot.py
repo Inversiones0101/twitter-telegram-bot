@@ -1,8 +1,8 @@
+import yfinance as yf
 import os
 import feedparser
 import requests
 import time
-import yfinance as yf
 
 # --- EL NUEVO DÚO DINÁMICO ---
 FEEDS = {
