@@ -10,10 +10,19 @@ FEEDS = {
 }
 
 def extraer_imagen_premium(entrada):
-    # Prioridad 1: Media content (imágenes nativas de BlueSky)
-    if 'media_content' in entrada: return entrada.media_content[0]['url']
-    # Prioridad 2: Enclosures (adjuntos de feed)
-    if 'enclosures' in entrada and entrada.enclosures: return entrada.enclosures[0]['url']
+    # 1. Buscar en media_content (Lo que ya teníamos)
+    if 'media_content' in entrada and entrada.media_content:
+        return entrada.media_content[0]['url']
+    
+    # 2. Buscar en enclosures (Adjuntos directos)
+    if 'enclosures' in entrada and entrada.enclosures:
+        return entrada.enclosures[0]['url']
+    
+    # 3. EL NUEVO TRUCO: Buscar en el sumario/descripción (Donde BlueSky a veces esconde el link)
+    if 'summary' in entrada:
+        img_match = re.search(r'src="([^"]+)"', entrada.summary)
+        if img_match: return img_match.group(1)
+        
     return None
 
 def enviar_telegram(titulo, link, image_url, fuente):
