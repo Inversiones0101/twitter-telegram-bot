@@ -2,8 +2,10 @@ import os
 import feedparser
 import requests
 import time
+import re
+import yfinance as yf
 
-# --- EL NUEVO DÚO DINÁMICO ---
+# --- CONFIGURACIÓN DE FEEDS (Agregamos El País para testear imágenes) ---
 FEEDS = {
     "EL_PAIS_TEST": "https://bsky.app/profile/elpais.com/rss",
     "TRENDSPIDER_BSKY": "https://bsky.app/profile/trendspider.com/rss",
@@ -11,15 +13,15 @@ FEEDS = {
 }
 
 def extraer_imagen_premium(entrada):
-    # 1. Buscar en media_content (Lo que ya teníamos)
+    # 1. Prioridad: Media content (BlueSky nativo)
     if 'media_content' in entrada and entrada.media_content:
         return entrada.media_content[0]['url']
     
-    # 2. Buscar en enclosures (Adjuntos directos)
+    # 2. Enclosures (RSS estándar)
     if 'enclosures' in entrada and entrada.enclosures:
         return entrada.enclosures[0]['url']
     
-    # 3. EL NUEVO TRUCO: Buscar en el sumario/descripción (Donde BlueSky a veces esconde el link)
+    # 3. REFUERZO: Buscar en el sumario (Ideal para El País / Noticias)
     if 'summary' in entrada:
         img_match = re.search(r'src="([^"]+)"', entrada.summary)
         if img_match: return img_match.group(1)
@@ -32,36 +34,58 @@ def enviar_telegram(titulo, link, image_url, fuente):
     
     txt_titulo = (titulo or "Análisis").strip()
     
-    # La magia del HTML: El link queda oculto en el nombre de la fuente
-    # Ej: BARCHART_BSKY aparecerá en azul y te llevará a BlueSky
-    caption_html = f"🎯 <b><a href='{link}'>{fuente}</a></b>\n━━━━━━━━━━━━━━\n📝 {txt_titulo}"
+    # HTML: El link se oculta en la fuente para máxima elegancia
+    if link:
+        caption_html = f"🎯 <b><a href='{link}'>{fuente}</a></b>\n━━━━━━━━━━━━━━\n📝 {txt_titulo}"
+    else:
+        # Para el Monitor de Precios que no tiene link
+        caption_html = f"🎯 <b>{fuente}</b>\n━━━━━━━━━━━━━━\n{txt_titulo}"
     
     try:
         if image_url:
             url = f"https://api.telegram.org/bot{token}/sendPhoto"
-            payload = {
-                'chat_id': chat_id,
-                'photo': image_url,
-                'caption': caption_html,
-                'parse_mode': 'HTML' # <--- CAMBIO CLAVE
-            }
+            payload = {'chat_id': chat_id, 'photo': image_url, 'caption': caption_html, 'parse_mode': 'HTML'}
             requests.post(url, json=payload, timeout=30)
         else:
             url = f"https://api.telegram.org/bot{token}/sendMessage"
             payload = {
-                'chat_id': chat_id,
-                'text': caption_html,
-                'parse_mode': 'HTML', # <--- CAMBIO CLAVE
-                'disable_web_page_preview': True
+                'chat_id': chat_id, 
+                'text': caption_html, 
+                'parse_mode': 'HTML', 
+                'disable_web_page_preview': True # Chau bloque gris
             }
             requests.post(url, json=payload, timeout=20)
     except Exception as e:
         print(f"Error en Telegram: {e}")
-        
-def main():
-    print("🚀 Radar Dúo Dinámico: TrendSpider + Barchart...")
-    archivo_h = "last_id_inicio.txt"
+
+def obtener_cuadro_mercado():
+    activos = {
+        "🇦🇷 MERVAL": "^MERV",
+        "🇺🇸 S&P 500": "^GSPC",
+        "🗽 DÓLAR CCL": "GGAL.BA", 
+        "📉 AL30": "AL30.BA"
+    }
     
+    mensaje = "🏦 <b>MONITOR DE PRECIOS</b>\n━━━━━━━━━━━━━━\n"
+    
+    for nombre, ticker in activos.items():
+        try:
+            data = yf.Ticker(ticker).history(period="2d")
+            if len(data) >= 2:
+                actual = data['Close'].iloc[-1]
+                anterior = data['Close'].iloc[-2]
+                var = ((actual - anterior) / anterior) * 100
+                color = "🟢" if var > 0 else "🔴"
+                # Formato tipo tarjeta
+                mensaje += f"<b>{nombre}</b> | {actual:,.2f} | {color} {var:+.2f}%\n"
+        except:
+            continue
+            
+    return mensaje + "━━━━━━━━━━━━━━"
+
+def main():
+    print("🚀 Iniciando Radar BlueSky...")
+    archivo_h = "last_id_inicio.txt"
     if not os.path.exists(archivo_h):
         with open(archivo_h, "w") as f: f.write("")
 
@@ -70,28 +94,27 @@ def main():
 
     for nombre, url in FEEDS.items():
         try:
-            print(f"🔍 Escaneando {nombre}...")
-            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0'}
+            headers = {'User-Agent': 'Mozilla/5.0'}
             resp = requests.get(url, headers=headers, timeout=30)
-            
             if resp.status_code == 200:
                 feed = feedparser.parse(resp.content)
-                # Invertimos para orden cronológico en Telegram
                 for entrada in reversed(feed.entries[:3]):
                     link = entrada.get('link')
                     if link and link not in historial:
-                        print(f"✨ ¡Nuevo posteo en {nombre}!")
                         titulo = entrada.get('title') or (entrada.get('description', '')[:70] + "...")
                         img = extraer_imagen_premium(entrada)
                         enviar_telegram(titulo, link, img, nombre)
-                        
                         with open(archivo_h, "a") as f: f.write(link + "\n")
                         historial.add(link)
-                        time.sleep(3)
-            else:
-                print(f"❌ {nombre} falló (Código {resp.status_code})")
+                        time.sleep(2)
         except Exception as e:
-            print(f"⚠️ Error en {nombre}: {e}")
+            print(f"Error en {nombre}: {e}")
 
 if __name__ == "__main__":
+    # 1. Buscamos novedades en BlueSky
     main()
+    
+    # 2. Mandamos el Monitor de Precios
+    print("📊 Enviando Monitor...")
+    reporte = obtener_cuadro_mercado()
+    enviar_telegram(reporte, None, None, "SISTEMA_MONITOR")
