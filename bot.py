@@ -7,7 +7,6 @@ import yfinance as yf
 
 # --- CONFIGURACIÓN DE FEEDS (Agregamos El País para testear imágenes) ---
 FEEDS = {
-    "EL_PAIS_TEST": "https://bsky.app/profile/elpais.com/rss",
     "TRENDSPIDER_BSKY": "https://bsky.app/profile/trendspider.com/rss",
     "BARCHART_BSKY": "https://bsky.app/profile/barchart.com/rss"
 }
@@ -32,14 +31,14 @@ def enviar_telegram(titulo, link, image_url, fuente):
     token = os.getenv('TELEGRAM_BOT_TOKEN')
     chat_id = os.getenv('TELEGRAM_CHAT_ID')
     
-    # Si no hay link (como en el Monitor), usamos texto simple
     if not link:
+        # Formato para el Monitor de Precios
         mensaje = f"🏦 <b>{fuente}</b>\n━━━━━━━━━━━━━━\n{titulo}"
         disable_preview = True
     else:
-        # Formato clásico: Título + Link abajo para que Telegram genere la vista previa
+        # Formato con link para que Telegram genere la card automáticamente
         mensaje = f"🎯 <b>{fuente}</b>\n━━━━━━━━━━━━━━\n📝 {titulo}\n\n🔗 {link}"
-        disable_preview = False # <--- ¡Esto activa la cajita azul!
+        disable_preview = False 
 
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     payload = {
@@ -48,11 +47,7 @@ def enviar_telegram(titulo, link, image_url, fuente):
         'parse_mode': 'HTML',
         'disable_web_page_preview': disable_preview
     }
-    
-    try:
-        requests.post(url, json=payload, timeout=20)
-    except Exception as e:
-        print(f"Error en Telegram: {e}")
+    requests.post(url, json=payload, timeout=20)
 
 def obtener_cuadro_mercado():
     activos = {
