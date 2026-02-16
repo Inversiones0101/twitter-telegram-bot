@@ -32,29 +32,25 @@ def enviar_telegram(titulo, link, image_url, fuente):
     token = os.getenv('TELEGRAM_BOT_TOKEN')
     chat_id = os.getenv('TELEGRAM_CHAT_ID')
     
-    txt_titulo = (titulo or "Análisis").strip()
-    
-    # HTML: El link se oculta en la fuente para máxima elegancia
-    if link:
-        caption_html = f"🎯 <b><a href='{link}'>{fuente}</a></b>\n━━━━━━━━━━━━━━\n📝 {txt_titulo}"
+    # Si no hay link (como en el Monitor), usamos texto simple
+    if not link:
+        mensaje = f"🏦 <b>{fuente}</b>\n━━━━━━━━━━━━━━\n{titulo}"
+        disable_preview = True
     else:
-        # Para el Monitor de Precios que no tiene link
-        caption_html = f"🎯 <b>{fuente}</b>\n━━━━━━━━━━━━━━\n{txt_titulo}"
+        # Formato clásico: Título + Link abajo para que Telegram genere la vista previa
+        mensaje = f"🎯 <b>{fuente}</b>\n━━━━━━━━━━━━━━\n📝 {titulo}\n\n🔗 {link}"
+        disable_preview = False # <--- ¡Esto activa la cajita azul!
+
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = {
+        'chat_id': chat_id,
+        'text': mensaje,
+        'parse_mode': 'HTML',
+        'disable_web_page_preview': disable_preview
+    }
     
     try:
-        if image_url:
-            url = f"https://api.telegram.org/bot{token}/sendPhoto"
-            payload = {'chat_id': chat_id, 'photo': image_url, 'caption': caption_html, 'parse_mode': 'HTML'}
-            requests.post(url, json=payload, timeout=30)
-        else:
-            url = f"https://api.telegram.org/bot{token}/sendMessage"
-            payload = {
-                'chat_id': chat_id, 
-                'text': caption_html, 
-                'parse_mode': 'HTML', 
-                'disable_web_page_preview': True # Chau bloque gris
-            }
-            requests.post(url, json=payload, timeout=20)
+        requests.post(url, json=payload, timeout=20)
     except Exception as e:
         print(f"Error en Telegram: {e}")
 
