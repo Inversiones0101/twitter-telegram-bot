@@ -2,9 +2,11 @@ import os
 import feedparser
 import requests
 import time
+import yfinance as yf
 
 # --- EL NUEVO DÚO DINÁMICO ---
 FEEDS = {
+    "EL_PAIS_TEST": "https://bsky.app/profile/elpais.com/rss",
     "TRENDSPIDER_BSKY": "https://bsky.app/profile/trendspider.com/rss",
     "BARCHART_BSKY": "https://bsky.app/profile/barchart.com/rss"
 }
