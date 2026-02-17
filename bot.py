@@ -14,14 +14,11 @@ FEEDS = {
 }
 
 def extraer_foto(entrada):
-    """Busca la URL de la imagen en los campos comunes del RSS de BlueSky."""
-    # Opción 1: Media content (estándar)
+    """Captura la URL de la imagen (la placa visual) del post"""
     if 'media_content' in entrada and entrada.media_content:
         return entrada.media_content[0]['url']
-    # Opción 2: Enclosures (adjuntos)
     if 'enclosures' in entrada and entrada.enclosures:
         return entrada.enclosures[0]['url']
-    # Opción 3: Buscar en el resumen (summary) con regex
     summary = entrada.get('summary', '')
     match = re.search(r'src="([^"]+)"', summary)
     if match:
@@ -32,36 +29,29 @@ def enviar_telegram(titulo, link, img_url, fuente):
     token = os.getenv('TELEGRAM_BOT_TOKEN')
     chat_id = os.getenv('TELEGRAM_CHAT_ID')
     
-    # Diseño limpio: Título en negrita y link discreto
-    caption = f"🎯 <b>{fuente}</b>\n━━━━━━━━━━━━━━\n📝 {titulo}\n\n🔗 <a href='{link}'>Ver en BlueSky</a>"
+    caption = f"🎯 <b>{fuente}</b>\n━━━━━━━━━━━━━━\n{titulo}\n\n🔗 <a href='{link}'>Ver en BlueSky</a>"
 
     try:
         if img_url:
-            # SI HAY IMAGEN: Se manda como FOTO (Modo Tarjeta)
+            # Manda la placa visual (Cuadro de Ámbito) como foto principal
             url = f"https://api.telegram.org/bot{token}/sendPhoto"
-            payload = {
-                'chat_id': chat_id,
-                'photo': img_url,
-                'caption': caption,
-                'parse_mode': 'HTML'
-            }
+            payload = {'chat_id': chat_id, 'photo': img_url, 'caption': caption, 'parse_mode': 'HTML'}
         else:
-            # SI NO HAY IMAGEN: Solo texto y MATAMOS la previsualización fea
+            # Si no hay foto, manda el texto limpio sin previsualización molesta
             url = f"https://api.telegram.org/bot{token}/sendMessage"
             payload = {
-                'chat_id': chat_id,
-                'text': caption,
-                'parse_mode': 'HTML',
+                'chat_id': chat_id, 
+                'text': caption, 
+                'parse_mode': 'HTML', 
                 'disable_web_page_preview': True
             }
         requests.post(url, json=payload, timeout=30)
     except Exception as e:
-        print(f"Error enviando a Telegram: {e}")
+        print(f"Error en Telegram: {e}")
 
 def main():
-    print("🚀 Iniciando Bot Informador Visual...")
+    print("🚀 Iniciando Bot Informador de Mercados...")
     archivo_h = "last_id_inicio.txt"
-    
     if not os.path.exists(archivo_h):
         with open(archivo_h, "w") as f: f.write("")
 
@@ -70,35 +60,38 @@ def main():
 
     for nombre, url in FEEDS.items():
         try:
-            headers = {'User-Agent': 'Mozilla/5.0'}
-            resp = requests.get(url, headers=headers, timeout=30)
+            resp = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=30)
             if resp.status_code == 200:
                 feed = feedparser.parse(resp.content)
-                
-                # Procesamos las últimas entradas
                 for entrada in reversed(feed.entries[:5]):
                     link = entrada.get('link')
                     if link and link not in historial:
-                        titulo = entrada.get('title', '')
-                        titulo_up = titulo.upper()
-                        
-                        # --- FILTRO ÁMBITO DÓLAR (Solo lo visual) ---
-                        if nombre == "AMBITO_DOLAR":
-                            if "APERTURA DE JORNADA" not in titulo_up and "CIERRE DE JORNADA" not in titulo_up:
-                                continue 
-                        
-                        # Intentamos capturar la imagen
+                        titulo_original = entrada.get('description', entrada.get('title', ''))
+                        titulo_up = titulo_original.upper()
                         img = extraer_foto(entrada)
                         
-                        enviar_telegram(titulo, link, img, nombre)
+                        # --- FILTRO FINCOINS: Solo los índices marcados ---
+                        if nombre == "FINCOINS_GLOBAL":
+                            lineas = titulo_original.split('\n')
+                            items = [l.strip() for l in lineas if "🔴" in l or "🟢" in l]
+                            if items:
+                                titulo_final = "📊 <b>Resumen Mundial:</b>\n" + "\n".join(items)
+                            else: continue
                         
-                        # Guardar en historial
-                        with open(archivo_h, "a") as f:
-                            f.write(link + "\n")
+                        # --- FILTRO ÁMBITO: Solo Apertura/Cierre con placa ---
+                        elif nombre == "AMBITO_DOLAR":
+                            if "APERTURA DE JORNADA" in titulo_up or "CIERRE DE JORNADA" in titulo_up:
+                                titulo_final = f"💵 <b>{titulo_original.split('.')[0]}</b>"
+                            else: continue
+                        else:
+                            titulo_final = f"📝 {titulo_original[:150]}..."
+
+                        enviar_telegram(titulo_final, link, img, nombre)
+                        with open(archivo_h, "a") as f: f.write(link + "\n")
                         historial.add(link)
                         time.sleep(2)
         except Exception as e:
-            print(f"Error procesando {nombre}: {e}")
+            print(f"Error en {nombre}: {e}")
 
 if __name__ == "__main__":
     main()
