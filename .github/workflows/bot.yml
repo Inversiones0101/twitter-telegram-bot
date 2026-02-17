@@ -3,7 +3,7 @@ name: Bot de Noticias Financieras Pro
 on:
   schedule:
     # Se ejecuta cada 15 minutos para atrapar los gráficos rápido
-    - cron: '*/15 * * * *'
+    - cron: '*/30 * * * *'
   workflow_dispatch: # Botón verde de "Run workflow"
 
 jobs:
