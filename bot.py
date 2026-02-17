@@ -115,11 +115,39 @@ def enviar_telegram(titulo, link, fuente):
     requests.post(url, json=payload, timeout=25)
 
 def main():
-    print("🚀 Iniciando Bot...")
-    # Monitor de Mercados
+    print("🚀 Ejecutando Monitor y Radar...")
+    
+    # --- LÓGICA DE ALERTA RAVA (Primera ejecución de la mañana) ---
+    tz_ar = pytz.timezone('America/Argentina/Buenos_Aires')
+    ahora_ar = datetime.now(tz_ar)
+    fecha_hoy = ahora_ar.strftime("%Y-%m-%d")
+    archivo_rava = "ultimo_rava.txt"
+    
+    # Si la hora es después de las 9:00 AM y antes de las 11:00 AM
+    if 9 <= ahora_ar.hour < 11:
+        # Revisamos si ya enviamos la alerta hoy
+        ultimo_envio = ""
+        if os.path.exists(archivo_rava):
+            with open(archivo_rava, "r") as f:
+                ultimo_envio = f.read().strip()
+        
+        if ultimo_envio != fecha_hoy:
+            mensaje_rava = (
+                "🔔 <b>¡APERTURA DE MERCADO!</b>\n"
+                "━━━━━━━━━━━━━━\n"
+                "Inicia la jornada financiera. Sigan el análisis en vivo en el canal de <b>Rava Bursátil</b>.\n\n"
+                "📺 <b>Ver aquí:</b> https://www.youtube.com/@RavaBursatil"
+            )
+            enviar_telegram(mensaje_rava, None, "ALERTA RAVA")
+            # Guardamos la fecha para no repetir hoy
+            with open(archivo_rava, "w") as f:
+                f.write(fecha_hoy)
+
+    # --- RESTO DEL BOT (Monitor y Feeds) ---
+    # 1. Enviar el Monitor Pro
     enviar_telegram(obtener_datos_monitor(), None, "MONITOR")
     
-    # Feeds de BlueSky
+    # 2. Procesar Feeds de BlueSky
     archivo_h = "last_id_inicio.txt"
     if not os.path.exists(archivo_h): open(archivo_h, "w").close()
     with open(archivo_h, "r") as f: historial = set(f.read().splitlines())
@@ -142,6 +170,6 @@ def main():
                     historial.add(link)
                     time.sleep(2)
         except: continue
-
+            
 if __name__ == "__main__":
     main()
