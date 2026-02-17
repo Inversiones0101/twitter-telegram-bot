@@ -1,2 +1,4 @@
-requests
 feedparser
+requests
+yfinance
+pytz
