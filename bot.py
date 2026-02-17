@@ -14,15 +14,23 @@ FEEDS = {
     "BARCHART_BSKY": "https://bsky.app/profile/barchart.com/rss"
 }
 
-# --- CONFIGURACIÓN DE ACTIVOS (Monitor Pro) ---
+# --- CONFIGURACIÓN DE ACTIVOS (Tickers Verificados) ---
 MARKETS = {
     "WALL_STREET": {
-        "^SPX": "S&P 500", "^DJI": "Dow Jones", "^IXIC": "NASDAQ", 
-        "^VIX": "VIX", "^TNX": "Tasa 10Y"
+        "^SPX": "S&P 500", 
+        "^DJI": "Dow Jones", 
+        "^IXIC": "NASDAQ", 
+        "^VIX": "VIX", 
+        "^TNX": "Tasa 10Y"  # <--- Este es el ticker oficial para el bono a 10 años
     },
     "COMMODITIES_Y_CRYPTO": {
-        "GC=F": "🟡 Gold", "ZS=F": "🟡 Soja", "CL=F": "🛢️ Oil", 
-        "SI=F": "⚪ Silver", "BTC-USD": "BTC", "ETH-USD": "ETH"
+        "GC=F": "🟡 Gold",    # Futuro del Oro
+        "SI=F": "⚪ Silver",  # Futuro de la Plata
+        "CL=F": "🛢️ Oil",     # Futuro del Petróleo Crudo
+        "ZS=F": "🟡 Soja",    # Futuro de la Soja
+        "BTC-USD": "BTC",
+        "ETH-USD": "ETH",
+        "SOL-USD": "SOL"      # <--- Agregamos Solana (SOL)
     }
 }
 
@@ -36,8 +44,7 @@ def esta_abierto_wall_street():
 
 def obtener_datos_monitor():
     lineas = ["🏦 <b>MONITOR DE MERCADOS</b>", "━━━━━━━━━━━━━━"]
-    ws_abierto = esta_abierto_wall_street()
-    estado_ws = "🟢 <b>ABIERTO</b>" if ws_abierto else "🔴 <b>CERRADO</b>"
+    # ... (resto del código de horario) ...
     
     lineas.append(f"\n🇺🇸 <b>Wall Street:</b> {estado_ws}")
     for ticker, nombre in MARKETS["WALL_STREET"].items():
@@ -46,8 +53,12 @@ def obtener_datos_monitor():
             precio = val['Close'].iloc[-1]
             cambio = ((precio / val['Close'].iloc[-2]) - 1) * 100
             emoji = "🟢" if cambio >= 0 else "🔴"
-            formato = f"{precio:.2f}%" if ticker == "^TNX" else f"{precio:,.2f}"
-            lineas.append(f"{emoji} {nombre}: {formato} ({cambio:+.2f}%)")
+            
+            # Formateo especial: Si es la tasa, mostrar símbolo de %
+            if ticker == "^TNX":
+                lineas.append(f"{emoji} {nombre}: {precio:.2f}% ({cambio:+.2f}%)")
+            else:
+                lineas.append(f"{emoji} {nombre}: {precio:,.2f} ({cambio:+.2f}%)")
         except: continue
 
     lineas.append(f"\n🌍 <b>Commodities y Crypto:</b> 🟢 <b>ABIERTO</b>")
@@ -60,7 +71,7 @@ def obtener_datos_monitor():
             lineas.append(f"{emoji} {nombre}: {precio:,.2f} ({cambio:+.2f}%)")
         except: continue
     return "\n".join(lineas)
-
+    
 def enviar_telegram(titulo, link, fuente):
     """Función simplificada para activar la Vista Previa azul"""
     token = os.getenv('TELEGRAM_BOT_TOKEN')
