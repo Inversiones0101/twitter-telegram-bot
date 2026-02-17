@@ -14,27 +14,30 @@ FEEDS = {
     "BARCHART_BSKY": "https://bsky.app/profile/barchart.com/rss"
 }
 
-# --- CONFIGURACIÓN DE ACTIVOS (Tickers Verificados) ---
+# --- CONFIGURACIÓN DE ACTIVOS (Ordenado por Secciones) ---
 MARKETS = {
     "WALL_STREET": {
         "^SPX": "S&P 500", 
         "^DJI": "Dow Jones", 
         "^IXIC": "NASDAQ", 
         "^VIX": "VIX", 
-        "^TNX": "Tasa 10Y"  # <--- Este es el ticker oficial para el bono a 10 años
+        "^TNX": "Tasa 10Y"
     },
-    "COMMODITIES_Y_CRYPTO": {
-        "GC=F": "🟡 Gold",    # Futuro del Oro
-        "SI=F": "⚪ Silver",  # Futuro de la Plata
-        "CL=F": "🛢️ Oil",     # Futuro del Petróleo Crudo
-        "ZS=F": "🟡 Soja",    # Futuro de la Soja
-        "BTC-USD": "BTC",
-        "ETH-USD": "ETH",
-        "SOL-USD": "SOL"      # <--- Agregamos Solana (SOL)
+    "COMMODITIES": {
+        "GC=F": "🟡 Gold", 
+        "ZS=F": "🟡 Soja", 
+        "CL=F": "🛢️ Oil", 
+        "SI=F": "⚪ Silver"
+    },
+    "CRYPTOS": {
+        "BTC-USD": "BTC", 
+        "ETH-USD": "ETH", 
+        "SOL-USD": "SOL"
     }
 }
 
 def esta_abierto_wall_street():
+    """Verifica si el mercado de NY está operando (9:30 - 16:00 EST)"""
     tz_ny = pytz.timezone('America/New_York')
     ahora_ny = datetime.now(tz_ny)
     if ahora_ny.weekday() >= 5: return False 
@@ -43,46 +46,64 @@ def esta_abierto_wall_street():
     return apertura <= ahora_ny <= cierre
 
 def obtener_datos_monitor():
+    """Genera el mensaje del Monitor con secciones separadas"""
     lineas = ["🏦 <b>MONITOR DE MERCADOS</b>", "━━━━━━━━━━━━━━"]
-    # ... (resto del código de horario) ...
     
-    lineas.append(f"\n🇺🇸 <b>Wall Street:</b> {estado_ws}")
+    # 1. Primero definimos el estado de Wall Street
+    abierto = esta_abierto_wall_street()
+    estado_ws = "🟢 <b>ABIERTO</b>" if abierto else "🔴 <b>CERRADO</b>"
+    
+    # --- SECCIÓN WALL STREET ---
+    lineas.append(f"\n🇺🇸 <b>WALL STREET:</b> {estado_ws}")
     for ticker, nombre in MARKETS["WALL_STREET"].items():
         try:
             val = yf.Ticker(ticker).history(period="2d")
+            if val.empty: continue
             precio = val['Close'].iloc[-1]
             cambio = ((precio / val['Close'].iloc[-2]) - 1) * 100
             emoji = "🟢" if cambio >= 0 else "🔴"
-            
-            # Formateo especial: Si es la tasa, mostrar símbolo de %
-            if ticker == "^TNX":
-                lineas.append(f"{emoji} {nombre}: {precio:.2f}% ({cambio:+.2f}%)")
-            else:
-                lineas.append(f"{emoji} {nombre}: {precio:,.2f} ({cambio:+.2f}%)")
+            # Formato especial para la Tasa 10Y
+            formato = f"{precio:.2f}%" if ticker == "^TNX" else f"{precio:,.2f}"
+            lineas.append(f"{emoji} {nombre}: {formato} ({cambio:+.2f}%)")
         except: continue
 
-    lineas.append(f"\n🌍 <b>Commodities y Crypto:</b> 🟢 <b>ABIERTO</b>")
-    for ticker, nombre in MARKETS["COMMODITIES_Y_CRYPTO"].items():
+    # --- SECCIÓN COMMODITIES ---
+    lineas.append(f"\n🧱 <b>COMMODITIES:</b> 🟢 <b>ABIERTO</b>")
+    for ticker, nombre in MARKETS["COMMODITIES"].items():
         try:
             val = yf.Ticker(ticker).history(period="2d")
+            if val.empty: continue
             precio = val['Close'].iloc[-1]
             cambio = ((precio / val['Close'].iloc[-2]) - 1) * 100
             emoji = "🟢" if cambio >= 0 else "🔴"
             lineas.append(f"{emoji} {nombre}: {precio:,.2f} ({cambio:+.2f}%)")
         except: continue
+
+    # --- SECCIÓN CRYPTOS ---
+    lineas.append(f"\n🪙 <b>CRYPTOS:</b> 🟢 <b>ABIERTO</b>")
+    for ticker, nombre in MARKETS["CRYPTOS"].items():
+        try:
+            val = yf.Ticker(ticker).history(period="2d")
+            if val.empty: continue
+            precio = val['Close'].iloc[-1]
+            cambio = ((precio / val['Close'].iloc[-2]) - 1) * 100
+            emoji = "🟢" if cambio >= 0 else "🔴"
+            lineas.append(f"{emoji} {nombre}: ${precio:,.2f} ({cambio:+.2f}%)")
+        except: continue
+        
     return "\n".join(lineas)
-    
+
 def enviar_telegram(titulo, link, fuente):
-    """Función simplificada para activar la Vista Previa azul"""
+    """Envia mensajes con o sin Vista Previa de imagen"""
     token = os.getenv('TELEGRAM_BOT_TOKEN')
     chat_id = os.getenv('TELEGRAM_CHAT_ID')
     
     if not link:
-        # Formato para el Monitor (Sin link, sin vista previa)
+        # Mensaje del Monitor (Texto puro)
         mensaje = f"🏦 <b>{fuente}</b>\n━━━━━━━━━━━━━━\n{titulo}"
         disable_preview = True
     else:
-        # Formato Clásico: Título + Link para que Telegram genere la card
+        # Mensaje de BlueSky (Con link para generar vista previa)
         mensaje = f"🎯 <b>{fuente}</b>\n━━━━━━━━━━━━━━\n📝 {titulo}\n\n🔗 {link}"
         disable_preview = False 
 
@@ -94,15 +115,17 @@ def enviar_telegram(titulo, link, fuente):
         'disable_web_page_preview': disable_preview
     }
     try:
-        requests.post(url, json=payload, timeout=20)
+        requests.post(url, json=payload, timeout=25)
     except Exception as e:
         print(f"Error en Telegram: {e}")
 
 def main():
-    # 1. Ejecutar Monitor
+    print("🚀 Iniciando Bot Informativo...")
+    
+    # 1. Enviar Monitor siempre que corra el script
     enviar_telegram(obtener_datos_monitor(), None, "MONITOR")
     
-    # 2. Procesar Feeds
+    # 2. Procesar Feeds de BlueSky
     archivo_h = "last_id_inicio.txt"
     if not os.path.exists(archivo_h): open(archivo_h, "w").close()
     with open(archivo_h, "r") as f: historial = set(f.read().splitlines())
@@ -114,14 +137,15 @@ def main():
                 link = entrada.get('link')
                 if link and link not in historial:
                     desc = entrada.get('description', entrada.get('title', ''))
-                    # Limpiar etiquetas HTML para que el texto sea legible
+                    # Limpiamos HTML
                     texto_limpio = re.sub(r'<[^>]+>', '', desc)
                     
-                    # Filtro para Ámbito Dólar
-                    if nombre == "AMBITO_DOLAR" and "APERTURA" not in texto_limpio.upper() and "CIERRE" not in texto_limpio.upper():
-                        continue
+                    # Filtro exclusivo para Ámbito Dólar
+                    if nombre == "AMBITO_DOLAR":
+                        if "APERTURA" not in texto_limpio.upper() and "CIERRE" not in texto_limpio.upper():
+                            continue
                     
-                    enviar_telegram(texto_limpio[:400], link, nombre)
+                    enviar_telegram(texto_limpio[:450], link, nombre)
                     
                     with open(archivo_h, "a") as f: f.write(link + "\n")
                     historial.add(link)
