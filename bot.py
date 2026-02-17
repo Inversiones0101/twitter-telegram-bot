@@ -9,7 +9,8 @@ FEEDS = {
     "ECONOMISTA_AR": "https://bsky.app/profile/eleconomista.com.ar.web.brid.gy/rss",
     "FINCOINS_GLOBAL": "https://bsky.app/profile/fincoins.bsky.social/rss",
     "AMBITO_DOLAR": "https://bsky.app/profile/ambitodolar.bsky.social/rss",
-    "TRENDSPIDER_BSKY": "https://bsky.app/profile/trendspider.com/rss"
+    "TRENDSPIDER_BSKY": "https://bsky.app/profile/trendspider.com/rss",
+    "BARCHART_BSKY": "https://bsky.app/profile/barchart.com/rss"
 }
 
 def extraer_foto(entrada):
