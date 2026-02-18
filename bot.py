@@ -132,14 +132,35 @@ def main():
                 ultimo_envio = f.read().strip()
         
         if ultimo_envio != fecha_hoy:
+            # Link a la transmisión específica de hoy
+            link_vivo = "https://www.youtube.com/watch?v=WxDmNAahZEc"
+            
             mensaje_rava = (
                 "🔔 <b>¡APERTURA DE MERCADO!</b>\n"
                 "━━━━━━━━━━━━━━\n"
-                "Inicia la jornada financiera. Sigan el análisis en vivo en el canal de <b>Rava Bursátil</b>.\n\n"
-                "📺 <b>Ver aquí:</b> https://www.youtube.com/@RavaBursatil"
+                "Ya está disponible <b>'La Mañana del Mercado'</b>. Sigan el análisis en vivo aquí:\n\n"
+                f"📺 <b>Ver Transmisión:</b> {link_vivo}\n"
+                "🏛️ <b>Canal Rava:</b> https://www.youtube.com/@RavaBursatil"
             )
-            enviar_telegram(mensaje_rava, None, "ALERTA RAVA")
-            # Guardamos la fecha para no repetir hoy
+            
+            # Enviamos con la imagen oficial de Rava para que resalte
+            url_imagen = "https://www.rava.com/assets/img/logo-rava.png"
+            url_tele = f"https://api.telegram.org/bot{os.getenv('TELEGRAM_BOT_TOKEN')}/sendPhoto"
+            
+            payload = {
+                'chat_id': os.getenv('TELEGRAM_CHAT_ID'),
+                'photo': url_imagen,
+                'caption': mensaje_rava,
+                'parse_mode': 'HTML'
+            }
+            
+            try:
+                requests.post(url_tele, json=payload, timeout=20)
+            except:
+                # Si falla la imagen, enviamos solo texto para no perder la alerta
+                enviar_telegram(mensaje_rava, None, "ALERTA RAVA")
+
+            # Guardamos la fecha para que no repita hoy
             with open(archivo_rava, "w") as f:
                 f.write(fecha_hoy)
 
