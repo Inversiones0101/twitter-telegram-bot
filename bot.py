@@ -117,36 +117,33 @@ def enviar_telegram(titulo, link, fuente):
 def main():
     print("🚀 Ejecutando Monitor y Radar...")
     
-    # --- LÓGICA DE ALERTA RAVA (Primera ejecución de la mañana) ---
+    # --- LÓGICA DE ALERTA RAVA ---
     tz_ar = pytz.timezone('America/Argentina/Buenos_Aires')
     ahora_ar = datetime.now(tz_ar)
     fecha_hoy = ahora_ar.strftime("%Y-%m-%d")
     archivo_rava = "ultimo_rava.txt"
     
-    # Si la hora es después de las 9:00 AM y antes de las 11:00 AM
-    if 9 <= ahora_ar.hour < 11:
-        # Revisamos si ya enviamos la alerta hoy
+    # Se ejecuta de Lunes (0) a Viernes (4) a partir de las 09:45 AM
+    if ahora_ar.weekday() < 5 and (ahora_ar.hour == 9 and ahora_ar.minute >= 45 or ahora_ar.hour > 9):
         ultimo_envio = ""
         if os.path.exists(archivo_rava):
             with open(archivo_rava, "r") as f:
                 ultimo_envio = f.read().strip()
         
         if ultimo_envio != fecha_hoy:
-            # Link a la transmisión específica de hoy
-            link_vivo = "https://www.youtube.com/watch?v=WxDmNAahZEc"
+            # Link automático a la sección "En Vivo" del canal
+            link_vivo = "https://www.youtube.com/@RavaBursatil/live"
             
             mensaje_rava = (
                 "🔔 <b>¡APERTURA DE MERCADO!</b>\n"
                 "━━━━━━━━━━━━━━\n"
-                "Ya está disponible <b>'La Mañana del Mercado'</b>. Sigan el análisis en vivo aquí:\n\n"
+                "Inicia la jornada financiera. Sigan el análisis en vivo de <b>Rava Bursátil</b> aquí:\n\n"
                 f"📺 <b>Ver Transmisión:</b> {link_vivo}\n"
-                "🏛️ <b>Canal Rava:</b> https://www.youtube.com/@RavaBursatil"
             )
             
-            # Enviamos con la imagen oficial de Rava para que resalte
+            # Intento de envío con imagen
             url_imagen = "https://www.rava.com/assets/img/logo-rava.png"
             url_tele = f"https://api.telegram.org/bot{os.getenv('TELEGRAM_BOT_TOKEN')}/sendPhoto"
-            
             payload = {
                 'chat_id': os.getenv('TELEGRAM_CHAT_ID'),
                 'photo': url_imagen,
@@ -155,12 +152,11 @@ def main():
             }
             
             try:
-                requests.post(url_tele, json=payload, timeout=20)
+                r = requests.post(url_tele, json=payload, timeout=20)
+                if r.status_code != 200: raise Exception()
             except:
-                # Si falla la imagen, enviamos solo texto para no perder la alerta
                 enviar_telegram(mensaje_rava, None, "ALERTA RAVA")
 
-            # Guardamos la fecha para que no repita hoy
             with open(archivo_rava, "w") as f:
                 f.write(fecha_hoy)
 
