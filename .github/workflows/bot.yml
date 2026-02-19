@@ -2,14 +2,13 @@ name: Bot de Noticias Financieras Pro
 
 on:
   schedule:
-    # Se ejecuta cada 15 minutos para atrapar los gráficos rápido
-    - cron: '*/30 * * * *'
-  workflow_dispatch: # Botón verde de "Run workflow"
+    # Se ejecuta cada 15 minutos (para asegurar que a las 09:45 se dispare)
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    # Tiempo límite de 5 minutos para que no gaste tus minutos de GitHub
     timeout-minutes: 5 
 
     steps:
@@ -33,15 +32,11 @@ jobs:
         TZ: 'America/Argentina/Buenos_Aires'
       run: python bot.py
       
-    - name: Guardar historial para no repetir
+    - name: Guardar historial (Persistencia)
       run: |
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
-        # Este comando crea el archivo si no existe para evitar el error de ayer
-        touch last_id_inicio.txt 
-        git add last_id_inicio.txt
-        git commit -m "Actualizar historial [skip ci]" || echo "Sin cambios para commitear"
+        touch last_id_inicio.txt ultimo_rava.txt
+        git add last_id_inicio.txt ultimo_rava.txt
+        git commit -m "Actualizar logs [skip ci]" || echo "Sin cambios"
         git push
-
-        
-        
