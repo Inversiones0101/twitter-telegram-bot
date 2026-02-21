@@ -117,13 +117,13 @@ def enviar_telegram(titulo, link, fuente):
 def main():
     print("🚀 Ejecutando Monitor y Radar...")
     
-    # --- LÓGICA DE ALERTA RAVA ---
+    # --- CONFIGURACIÓN DE TIEMPO ---
     tz_ar = pytz.timezone('America/Argentina/Buenos_Aires')
     ahora_ar = datetime.now(tz_ar)
     fecha_hoy = ahora_ar.strftime("%Y-%m-%d")
-    archivo_rava = "ultimo_rava.txt"
     
-    # Se ejecuta de Lunes (0) a Viernes (4) a partir de las 09:45 AM
+    # --- 1. LÓGICA DE ALERTA RAVA (Solo una vez a partir de las 09:45 AM) ---
+    archivo_rava = "ultimo_rava.txt"
     if ahora_ar.weekday() < 5 and (ahora_ar.hour == 9 and ahora_ar.minute >= 45 or ahora_ar.hour > 9):
         ultimo_envio = ""
         if os.path.exists(archivo_rava):
@@ -131,9 +131,7 @@ def main():
                 ultimo_envio = f.read().strip()
         
         if ultimo_envio != fecha_hoy:
-            # Link automático a la sección "En Vivo" del canal
             link_vivo = "https://www.youtube.com/@RavaBursatil/live"
-            
             mensaje_rava = (
                 "🔔 <b>¡APERTURA DE MERCADO!</b>\n"
                 "━━━━━━━━━━━━━━\n"
@@ -141,7 +139,6 @@ def main():
                 f"📺 <b>Ver Transmisión:</b> {link_vivo}\n"
             )
             
-            # Intento de envío con imagen
             url_imagen = "https://www.rava.com/assets/img/logo-rava.png"
             url_tele = f"https://api.telegram.org/bot{os.getenv('TELEGRAM_BOT_TOKEN')}/sendPhoto"
             payload = {
@@ -160,11 +157,17 @@ def main():
             with open(archivo_rava, "w") as f:
                 f.write(fecha_hoy)
 
-    # --- RESTO DEL BOT (Monitor y Feeds) ---
-    # 1. Enviar el Monitor Pro
-    enviar_telegram(obtener_datos_monitor(), None, "MONITOR")
-    
-    # 2. Procesar Feeds de BlueSky
+    # --- 2. LÓGICA DEL MONITOR (Lunes a Viernes, de 10hs a 20hs) ---
+    # Aquí es donde aplicamos el filtro estricto que pediste
+    if ahora_ar.weekday() < 5 and 10 <= ahora_ar.hour <= 20:
+        print(f"📊 {ahora_ar.strftime('%H:%M')} - Dentro de franja horaria. Enviando Monitor...")
+        enviar_telegram(obtener_datos_monitor(), None, "MONITOR")
+    else:
+        print(f"⏳ {ahora_ar.strftime('%H:%M')} - Monitor fuera de horario (10-20hs L-V). Se omite envío.")
+
+    # --- 3. LÓGICA DE FEEDS BLUESKY (Siempre disponible 24/7) ---
+    # Esta parte no tiene filtros de horario, se ejecuta cada vez que el bot corre
+    print("🌐 Procesando Feeds de BlueSky...")
     archivo_h = "last_id_inicio.txt"
     if not os.path.exists(archivo_h): open(archivo_h, "w").close()
     with open(archivo_h, "r") as f: historial = set(f.read().splitlines())
@@ -186,7 +189,9 @@ def main():
                     with open(archivo_h, "a") as f: f.write(link + "\n")
                     historial.add(link)
                     time.sleep(2)
-        except: continue
+        except Exception as e:
+            print(f"Error en feed {nombre}: {e}")
+            continue
             
 if __name__ == "__main__":
     main()
