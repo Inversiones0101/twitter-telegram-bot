@@ -24,10 +24,10 @@ MARKETS = {
         "^TNX": "Tasa 10Y"
     },
     "COMMODITIES": {
-        "GC=F": "🟡 Gold", 
-        "ZS=F": "🟡 Soja", 
-        "CL=F": "🛢️ Oil", 
-        "SI=F": "⚪ Silver"
+        "GC=F": "Gold", 
+        "ZS=F": "Soja", 
+        "CL=F": "Oil", 
+        "SI=F": "Silver"
     },
     "CRYPTOS": {
         "BTC-USD": "BTC", 
