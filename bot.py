@@ -60,13 +60,13 @@ def obtener_datos_monitor():
             precio = val['Close'].iloc[-1]
             cambio = ((precio / val['Close'].iloc[-2]) - 1) * 100
             
-            # Usamos círculos para garantizar verde/rojo vibrante
+            # El círculo al inicio mantiene la columna visual recta
             color = "🟢" if cambio >= 0 else "🔴"
             
             if ticker == "^TNX":
-                lineas.append(f"<b>{nombre}:</b> {color} <code>{precio:.2f}% ({cambio:+.2f}%)</code>")
+                lineas.append(f"{color} <b>{nombre}:</b> <code>{precio:.2f}% ({cambio:+.2f}%)</code>")
             else:
-                lineas.append(f"<b>{nombre}:</b> {color} <code>{precio:,.2f} ({cambio:+.2f}%)</code>")
+                lineas.append(f"{color} <b>{nombre}:</b> <code>{precio:,.2f} ({cambio:+.2f}%)</code>")
         except: continue
 
     # --- SECCIÓN COMMODITIES ---
@@ -78,7 +78,7 @@ def obtener_datos_monitor():
             precio = val['Close'].iloc[-1]
             cambio = ((precio / val['Close'].iloc[-2]) - 1) * 100
             color = "🟢" if cambio >= 0 else "🔴"
-            lineas.append(f"<b>{nombre}:</b> {color} <code>{precio:,.2f} ({cambio:+.2f}%)</code>")
+            lineas.append(f"{color} <b>{nombre}:</b> <code>{precio:,.2f} ({cambio:+.2f}%)</code>")
         except: continue
 
     # --- SECCIÓN CRYPTOS ---
@@ -90,7 +90,7 @@ def obtener_datos_monitor():
             precio = val['Close'].iloc[-1]
             cambio = ((precio / val['Close'].iloc[-2]) - 1) * 100
             color = "🟢" if cambio >= 0 else "🔴"
-            lineas.append(f"<b>{nombre}:</b> {color} <code>${precio:,.2f} ({cambio:+.2f}%)</code>")
+            lineas.append(f"{color} <b>{nombre}:</b> <code>${precio:,.2f} ({cambio:+.2f}%)</code>")
         except: continue
         
     return "\n".join(lineas)
