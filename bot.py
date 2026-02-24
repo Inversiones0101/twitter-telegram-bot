@@ -60,13 +60,13 @@ def obtener_datos_monitor():
             precio = val['Close'].iloc[-1]
             cambio = ((precio / val['Close'].iloc[-2]) - 1) * 100
             
-            # Definimos el icono de tendencia (único indicador de color)
-            tendencia = "🔺" if cambio >= 0 else "🔻"
+            # Usamos círculos para garantizar verde/rojo vibrante
+            color = "🟢" if cambio >= 0 else "🔴"
             
             if ticker == "^TNX":
-                lineas.append(f"{tendencia} <b>{nombre}:</b> <code>{precio:.2f}% ({cambio:+.2f}%)</code>")
+                lineas.append(f"<b>{nombre}:</b> {color} <code>{precio:.2f}% ({cambio:+.2f}%)</code>")
             else:
-                lineas.append(f"{tendencia} <b>{nombre}:</b> <code>{precio:,.2f} ({cambio:+.2f}%)</code>")
+                lineas.append(f"<b>{nombre}:</b> {color} <code>{precio:,.2f} ({cambio:+.2f}%)</code>")
         except: continue
 
     # --- SECCIÓN COMMODITIES ---
@@ -77,11 +77,8 @@ def obtener_datos_monitor():
             if len(val) < 2: continue
             precio = val['Close'].iloc[-1]
             cambio = ((precio / val['Close'].iloc[-2]) - 1) * 100
-            
-            tendencia = "🔺" if cambio >= 0 else "🔻"
-            
-            # Buscamos el emoji correspondiente al nombre (ej: 🛢️ Oil)
-            lineas.append(f"{tendencia} <b>{nombre}:</b> <code>{precio:,.2f} ({cambio:+.2f}%)</code>")
+            color = "🟢" if cambio >= 0 else "🔴"
+            lineas.append(f"<b>{nombre}:</b> {color} <code>{precio:,.2f} ({cambio:+.2f}%)</code>")
         except: continue
 
     # --- SECCIÓN CRYPTOS ---
@@ -92,10 +89,8 @@ def obtener_datos_monitor():
             if len(val) < 2: continue
             precio = val['Close'].iloc[-1]
             cambio = ((precio / val['Close'].iloc[-2]) - 1) * 100
-            
-            tendencia = "🔺" if cambio >= 0 else "🔻"
-            
-            lineas.append(f"{tendencia} <b>{nombre}:</b> <code>${precio:,.2f} ({cambio:+.2f}%)</code>")
+            color = "🟢" if cambio >= 0 else "🔴"
+            lineas.append(f"<b>{nombre}:</b> {color} <code>${precio:,.2f} ({cambio:+.2f}%)</code>")
         except: continue
         
     return "\n".join(lineas)
