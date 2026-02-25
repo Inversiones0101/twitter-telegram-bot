@@ -2,8 +2,8 @@ name: Bot de Noticias Financieras Pro
 
 on:
   schedule:
-    # Se ejecuta al minuto 0 de cada hora, los 7 días de la semana
-    - cron: '0 * * * *'
+    # Se ejecuta cada 30 minutos, los 7 días de la semana
+    - cron: '*/30 * * * *'
   workflow_dispatch:
 
 jobs:
