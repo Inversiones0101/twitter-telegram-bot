@@ -158,13 +158,13 @@ def main():
             with open(archivo_rava, "w") as f:
                 f.write(fecha_hoy)
 
-    # --- 2. LÓGICA DEL MONITOR (Lunes a Viernes, de 10hs a 20hs) ---
+    # --- 2. LÓGICA DEL MONITOR (Lunes a Viernes, de 10hs a 19hs) ---
     # Aquí es donde aplicamos el filtro estricto que pediste
-    if ahora_ar.weekday() < 5 and 10 <= ahora_ar.hour <= 20:
+    if ahora_ar.weekday() < 5 and 10 <= ahora_ar.hour <= 19:
         print(f"📊 {ahora_ar.strftime('%H:%M')} - Dentro de franja horaria. Enviando Monitor...")
         enviar_telegram(obtener_datos_monitor(), None, "MONITOR")
     else:
-        print(f"⏳ {ahora_ar.strftime('%H:%M')} - Monitor fuera de horario (10-20hs L-V). Se omite envío.")
+        print(f"⏳ {ahora_ar.strftime('%H:%M')} - Monitor fuera de horario (10-19hs L-V). Se omite envío.")
 
     # --- 3. LÓGICA DE FEEDS BLUESKY (Siempre disponible 24/7) ---
     # Esta parte no tiene filtros de horario, se ejecuta cada vez que el bot corre
